@@ -156,7 +156,8 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def async_remove_entry(
-    hass: HomeAssistant, entry: ConfigEntry  # noqa: ARG001
+    hass: HomeAssistant,
+    entry: ConfigEntry,  # noqa: ARG001
 ) -> None:
     """Clean up when the config entry is removed."""
     async_unregister_panel(hass)
@@ -164,7 +165,8 @@ async def async_remove_entry(
 
 
 async def async_migrate_entry(
-    hass: HomeAssistant, entry: ConfigEntry  # noqa: ARG001
+    hass: HomeAssistant,
+    entry: ConfigEntry,  # noqa: ARG001
 ) -> bool:
     """Handle migration of config entry data."""
     return True
