@@ -41,6 +41,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     @callback
     def handle_tag_scanned_event(event: Event) -> None:
+        """Complete tasks associated with a scanned NFC tag."""
         tag_id = event.data.get("tag_id")
         store = _store(hass)
         if store is None or not tag_id:
@@ -50,6 +51,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     @callback
     def handle_state_changed(event: Event) -> None:
+        """Complete tasks when their configured source reaches its target state."""
         entity_id = event.data.get("entity_id")
         new_state = event.data.get("new_state")
         store = _store(hass)
@@ -60,7 +62,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 store.complete_task(task["id"], source="entity")
 
     @callback
-    def check_notifications(_now=None) -> None:
+    def check_notifications(_now: datetime | None = None) -> None:
+        """Notify once per day for tasks inside their notification window."""
         store = _store(hass)
         if store is None:
             return
@@ -152,26 +155,33 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await async_setup_entry(hass, entry)
 
 
-async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:  # noqa: ARG001
+async def async_remove_entry(
+    hass: HomeAssistant, entry: ConfigEntry  # noqa: ARG001
+) -> None:
     """Clean up when the config entry is removed."""
     async_unregister_panel(hass)
     hass.data.pop(const.DOMAIN, None)
 
 
-async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  # noqa: ARG001
+async def async_migrate_entry(
+    hass: HomeAssistant, entry: ConfigEntry  # noqa: ARG001
+) -> bool:
     """Handle migration of config entry data."""
     return True
 
 
 def _store(hass: HomeAssistant) -> TaskStore | None:
+    """Return the loaded task store."""
     data = hass.data.get(const.DOMAIN)
     return data.get("store") if data else None
 
 
 def _task_id_from_entity(hass: HomeAssistant, entity_id: str) -> str:
+    """Resolve a Home Maintenance entity to its task unique ID."""
     registry_entry = er.async_get(hass).async_get(entity_id)
     if registry_entry is None or registry_entry.platform != const.DOMAIN:
-        raise HomeAssistantError(f"Entity {entity_id} is not a Home Maintenance task")
+        msg = f"Entity {entity_id} is not a Home Maintenance task"
+        raise HomeAssistantError(msg)
     return cast("RegistryEntry", registry_entry).unique_id
 
 
@@ -180,23 +190,29 @@ def register_services(hass: HomeAssistant) -> None:
     """Register services exposed by Home Maintenance."""
 
     def require_store() -> TaskStore:
+        """Return the task store or raise a user-facing service error."""
         store = _store(hass)
         if store is None:
-            raise HomeAssistantError("Home Maintenance is not loaded")
+            msg = "Home Maintenance is not loaded"
+            raise HomeAssistantError(msg)
         return store
 
     async def async_srv_reset(call: ServiceCall) -> None:
+        """Complete a task using an optional historical date."""
         performed_date = None
         if value := call.data.get("performed_date"):
             parsed = dt_util.parse_date(value)
             if parsed is None:
-                raise HomeAssistantError(f"Could not parse performed_date: {value}")
-            performed_date = dt_util.as_local(datetime.combine(parsed, datetime.min.time()))
+                msg = f"Could not parse performed_date: {value}"
+                raise HomeAssistantError(msg)
+            combined = datetime.combine(parsed, datetime.min.time())
+            performed_date = dt_util.as_local(combined)
         require_store().complete_task(
             _task_id_from_entity(hass, call.data["entity_id"]), performed_date
         )
 
     async def async_srv_create(call: ServiceCall) -> None:
+        """Create a recurring task."""
         now = dt_util.now().replace(hour=0, minute=0, second=0, microsecond=0)
         task = HomeMaintenanceTask(
             id=f"home_maintenance_{uuid.uuid4().hex}",
@@ -211,18 +227,25 @@ def register_services(hass: HomeAssistant) -> None:
         require_store().add(task)
 
     async def async_srv_complete(call: ServiceCall) -> None:
-        require_store().complete_task(_task_id_from_entity(hass, call.data["entity_id"]))
+        """Complete a task now."""
+        task_id = _task_id_from_entity(hass, call.data["entity_id"])
+        require_store().complete_task(task_id)
 
     async def async_srv_snooze(call: ServiceCall) -> None:
+        """Snooze a task for the requested number of days."""
         require_store().snooze_task(
             _task_id_from_entity(hass, call.data["entity_id"]), call.data["days"]
         )
 
     async def async_srv_skip(call: ServiceCall) -> None:
-        require_store().skip_task(_task_id_from_entity(hass, call.data["entity_id"]))
+        """Skip the current task occurrence."""
+        task_id = _task_id_from_entity(hass, call.data["entity_id"])
+        require_store().skip_task(task_id)
 
     async def async_srv_delete(call: ServiceCall) -> None:
-        require_store().delete(_task_id_from_entity(hass, call.data["entity_id"]))
+        """Delete a task."""
+        task_id = _task_id_from_entity(hass, call.data["entity_id"])
+        require_store().delete(task_id)
 
     services = (
         (const.SERVICE_RESET, async_srv_reset, const.SERVICE_RESET_SCHEMA),
