@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 INTERVAL_TYPES = ("days", "weeks", "months", "years")
+DUE_SOON_DAYS = 7
 
 
 def calculate_next_due(
@@ -21,7 +22,8 @@ def calculate_next_due(
         return last_performed + relativedelta(months=interval_value)
     if interval_type == "years":
         return last_performed + relativedelta(years=interval_value)
-    raise ValueError(f"Unsupported interval type: {interval_type}")
+    msg = f"Unsupported interval type: {interval_type}"
+    raise ValueError(msg)
 
 
 def effective_due_date(task: dict, now: datetime | None = None) -> datetime | None:
@@ -71,6 +73,6 @@ def task_status(task: dict, now: datetime) -> str:
         return "overdue"
     if delta == 0:
         return "due_today"
-    if delta <= 7:
+    if delta <= DUE_SOON_DAYS:
         return "due_soon"
     return "later"
