@@ -31,7 +31,7 @@ def test_year_interval_supported() -> None:
 
 
 def test_unknown_interval_rejected() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unsupported interval type"):
         calculate_next_due(datetime(2026, 1, 1, tzinfo=TZ), 1, "fortnights")
 
 
