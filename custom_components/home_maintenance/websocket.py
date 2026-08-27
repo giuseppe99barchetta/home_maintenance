@@ -59,9 +59,7 @@ TASK_UPDATES_SCHEMA = vol.Schema(
         vol.Optional("description"): vol.Any(str, None),
         vol.Optional("url"): vol.Any(str, None),
         vol.Optional("notify_enabled"): bool,
-        vol.Optional("notify_before_days"): vol.All(
-            int, vol.Range(min=0, max=365)
-        ),
+        vol.Optional("notify_before_days"): vol.All(int, vol.Range(min=0, max=365)),
         vol.Optional("source_entity_id"): vol.Any(str, None),
         vol.Optional("source_state"): vol.Any(str, None),
     },
@@ -91,9 +89,7 @@ def _normalize_date(value: str | None) -> str | None:
     """Normalize a frontend date or datetime to local midnight."""
     if not value:
         return (
-            dt_util.now()
-            .replace(hour=0, minute=0, second=0, microsecond=0)
-            .isoformat()
+            dt_util.now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
         )
     parsed = dt_util.parse_datetime(value)
     if parsed is None:
@@ -161,9 +157,7 @@ def websocket_add_task(
 
     last_performed = _normalize_date(msg.get("last_performed"))
     if last_performed is None:
-        conn.send_error(
-            msg["id"], "invalid_date", "Could not parse last_performed"
-        )
+        conn.send_error(msg["id"], "invalid_date", "Could not parse last_performed")
         return
 
     task = HomeMaintenanceTask(
@@ -207,17 +201,13 @@ def websocket_update_task(
     if "title" in updates:
         updates["title"] = updates["title"].strip()
         if not updates["title"]:
-            conn.send_error(
-                msg["id"], "invalid_title", "Task title cannot be empty"
-            )
+            conn.send_error(msg["id"], "invalid_title", "Task title cannot be empty")
             return
 
     if "last_performed" in updates:
         normalized = _normalize_date(updates["last_performed"])
         if normalized is None:
-            conn.send_error(
-                msg["id"], "invalid_date", "Could not parse last_performed"
-            )
+            conn.send_error(msg["id"], "invalid_date", "Could not parse last_performed")
             return
         updates["last_performed"] = normalized
 
@@ -322,9 +312,7 @@ def websocket_export(
     """Export portable maintenance task data."""
     store = _get_store(hass, conn, msg)
     if store is not None:
-        conn.send_result(
-            msg["id"], {"version": 2, "tasks": store.export_data()}
-        )
+        conn.send_result(msg["id"], {"version": 2, "tasks": store.export_data()})
 
 
 @callback
@@ -429,9 +417,7 @@ async def async_register_websockets(hass: HomeAssistant) -> None:
         websocket_snooze_task,
         {
             vol.Required("task_id"): str,
-            vol.Required("days"): vol.All(
-                int, vol.Range(min=1, max=3650)
-            ),
+            vol.Required("days"): vol.All(int, vol.Range(min=1, max=3650)),
         },
     )
     _register_command(hass, "statistics", websocket_statistics)
@@ -450,9 +436,7 @@ async def async_register_websockets(hass: HomeAssistant) -> None:
         vol.Optional("description"): str,
         vol.Optional("url"): str,
         vol.Optional("notify_enabled"): bool,
-        vol.Optional("notify_before_days"): vol.All(
-            int, vol.Range(min=0, max=365)
-        ),
+        vol.Optional("notify_before_days"): vol.All(int, vol.Range(min=0, max=365)),
         vol.Optional("source_entity_id"): str,
         vol.Optional("source_state"): str,
     }
