@@ -1,27 +1,39 @@
+name: Release validation
+
 on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
 jobs:
-  build:
+  verify-version:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Get version
-        id: version
-        uses: home-assistant/actions/helpers/version@master
-
-      - name: Patch manifest and zip
-        run: |
-          sed -i 's/v0.0.0/${{ steps.version.outputs.version }}/' custom_components/home_maintenance/manifest.json
-
-          cd custom_components/home_maintenance/
-          zip ../../home_maintenance.zip ./* translations/* panel/dist/* -x '.*'
-      - name: Upload ZIP to Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: home_maintenance.zip
+      - name: Verify release tag matches manifest
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          manifest = json.loads(
+              Path("custom_components/home_maintenance/manifest.json").read_text()
+          )
+          release = os.environ["RELEASE_TAG"].removeprefix("v")
+          version = manifest["version"].removeprefix("v")
+          if release != version:
+              raise SystemExit(
+                  f"Release tag {release!r} does not match manifest version {version!r}"
+              )
+          print(f"Release version {version} is consistent")
+          PY
+
+      - name: Verify frontend syntax
+        run: node --check custom_components/home_maintenance/panel/src/main.js
