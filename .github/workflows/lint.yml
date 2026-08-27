@@ -27,5 +27,8 @@ jobs:
       - name: Lint
         run: python3 -m ruff check .
 
-      - name: Format
-        run: python3 -m ruff format . --check
+      - name: Format probe
+        run: |
+          python3 -m ruff format .
+          git diff -- custom_components/home_maintenance/__init__.py custom_components/home_maintenance/store.py custom_components/home_maintenance/websocket.py
+          git diff --exit-code
