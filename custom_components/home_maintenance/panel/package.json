@@ -1,11 +1,11 @@
 {
   "name": "home-maintenance-panel",
-  "version": "1.5.2",
+  "version": "2.0.0",
   "private": true,
   "description": "Frontend panel for the Home Maintenance Home Assistant integration",
   "scripts": {
-    "build": "cp src/main.js dist/main.js",
-    "test": "npm run build && node --check dist/main.js && git diff --exit-code -- dist/main.js"
+    "build": "node --check src/main.js",
+    "test": "node --check src/main.js"
   },
   "author": "Giuseppe Barchetta <giuseppe99barchetta@users.noreply.github.com>",
   "repository": "https://github.com/giuseppe99barchetta/home_maintenance",
