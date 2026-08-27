@@ -45,9 +45,9 @@ def _get_store(
 def _normalize_date(value: str | None) -> str | None:
     """Normalize a frontend date/datetime to local midnight."""
     if not value:
-        return dt_util.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        ).isoformat()
+        return (
+            dt_util.now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        )
 
     parsed = dt_util.parse_datetime(value)
     if parsed is None:
