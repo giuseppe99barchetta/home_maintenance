@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import attr
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry, storage
 from homeassistant.util import dt as dt_util
 
 from . import const
 from .binary_sensor import HomeMaintenanceSensor
 from .schedule import calculate_next_due, effective_due_date
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
