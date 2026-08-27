@@ -1,27 +1,31 @@
 """Support for Home Maintenance."""
 
 import logging
+import uuid
 from datetime import datetime
 from typing import cast
 
+from homeassistant.components import persistent_notification
 from homeassistant.components.binary_sensor import DOMAIN as PLATFORM
 from homeassistant.components.tag.const import EVENT_TAG_SCANNED
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EVENT_STATE_CHANGED
 from homeassistant.core import Event, HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_registry import RegistryEntry  # noqa: TC002
+from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
 from . import const
 from .panel import async_register_panel, async_unregister_panel
-from .store import TaskStore
+from .schedule import day_delta, effective_due_date
+from .store import HomeMaintenanceTask, TaskStore
 from .websocket import async_register_websockets
 
 _LOGGER = logging.getLogger(__name__)
-
 CONFIG_SCHEMA = const.CONFIG_SCHEMA
 
 
@@ -37,20 +41,58 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     @callback
     def handle_tag_scanned_event(event: Event) -> None:
-        """Mark tasks associated with a scanned tag as performed."""
         tag_id = event.data.get("tag_id")
-        domain_data = hass.data.get(const.DOMAIN)
-        store = domain_data.get("store") if domain_data else None
+        store = _store(hass)
         if store is None or not tag_id:
             return
+        for task in store.get_by_tag_uuid(tag_id):
+            store.complete_task(task["id"], source="nfc")
 
-        tasks = store.get_by_tag_uuid(tag_id)
-        if not tasks:
+    @callback
+    def handle_state_changed(event: Event) -> None:
+        entity_id = event.data.get("entity_id")
+        new_state = event.data.get("new_state")
+        store = _store(hass)
+        if store is None or not entity_id or new_state is None:
             return
+        for task in store.get_by_source_entity(entity_id):
+            if new_state.state == task.get("source_state"):
+                store.complete_task(task["id"], source="entity")
 
-        _LOGGER.debug("Tag scanned: %s", tag_id)
-        for task in tasks:
-            store.update_last_performed(task["id"])
+    @callback
+    def check_notifications(_now=None) -> None:
+        store = _store(hass)
+        if store is None:
+            return
+        now = dt_util.now()
+        today = now.date().isoformat()
+        for task in store.get_all():
+            if not task.get("notify_enabled") or task.get("last_notified") == today:
+                continue
+            due = effective_due_date(task, now)
+            if due is None:
+                continue
+            delta = day_delta(due, now)
+            before = int(task.get("notify_before_days", 0))
+            if delta > before:
+                continue
+            if delta < 0:
+                timing = f"overdue by {abs(delta)} day(s)"
+            elif delta == 0:
+                timing = "due today"
+            else:
+                timing = f"due in {delta} day(s)"
+            persistent_notification.async_create(
+                hass,
+                f"{task['title']} is {timing}.",
+                title="Home Maintenance",
+                notification_id=f"home_maintenance_{task['id']}",
+            )
+            store.update_task(task["id"], {"last_notified": today})
+            hass.bus.async_fire(
+                const.EVENT_TASK_DUE,
+                {"task_id": task["id"], "title": task["title"], "days": delta},
+            )
 
     task_store = TaskStore(hass)
     await task_store.async_load()
@@ -76,9 +118,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, [PLATFORM])
     await async_register_panel(hass, entry)
 
-    unsub = hass.bus.async_listen(EVENT_TAG_SCANNED, handle_tag_scanned_event)
-    hass.data[const.DOMAIN]["unsub_tag_scanned"] = unsub
-
+    hass.data[const.DOMAIN]["unsub_tag_scanned"] = hass.bus.async_listen(
+        EVENT_TAG_SCANNED, handle_tag_scanned_event
+    )
+    hass.data[const.DOMAIN]["unsub_state_changed"] = hass.bus.async_listen(
+        EVENT_STATE_CHANGED, handle_state_changed
+    )
+    hass.data[const.DOMAIN]["unsub_notifications"] = async_track_time_change(
+        hass, check_notifications, hour=9, minute=0, second=0
+    )
+    check_notifications()
     return True
 
 
@@ -87,12 +136,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, [PLATFORM])
     if not unload_ok:
         return False
-
     domain_data = hass.data.get(const.DOMAIN, {})
-    unsub = domain_data.get("unsub_tag_scanned")
-    if unsub:
-        unsub()
-
+    for key in ("unsub_tag_scanned", "unsub_state_changed", "unsub_notifications"):
+        unsub = domain_data.get(key)
+        if unsub:
+            unsub()
     async_unregister_panel(hass)
     hass.data.pop(const.DOMAIN, None)
     return True
@@ -115,50 +163,74 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool: 
     return True
 
 
+def _store(hass: HomeAssistant) -> TaskStore | None:
+    data = hass.data.get(const.DOMAIN)
+    return data.get("store") if data else None
+
+
+def _task_id_from_entity(hass: HomeAssistant, entity_id: str) -> str:
+    registry_entry = er.async_get(hass).async_get(entity_id)
+    if registry_entry is None or registry_entry.platform != const.DOMAIN:
+        raise HomeAssistantError(f"Entity {entity_id} is not a Home Maintenance task")
+    return cast("RegistryEntry", registry_entry).unique_id
+
+
 @callback
 def register_services(hass: HomeAssistant) -> None:
     """Register services exposed by Home Maintenance."""
 
-    async def async_srv_reset(call: ServiceCall) -> None:
-        entity_id = call.data["entity_id"]
-        performed_date_str = call.data.get("performed_date")
-
-        performed_date = None
-        if performed_date_str is not None:
-            parsed_date = dt_util.parse_date(performed_date_str)
-            if parsed_date is None:
-                msg = f"Could not parse performed_date: {performed_date_str}"
-                raise HomeAssistantError(msg)
-            combined_date = datetime.combine(parsed_date, datetime.min.time())
-            performed_date = dt_util.as_local(combined_date)
-
-        domain_data = hass.data.get(const.DOMAIN)
-        if not domain_data:
-            msg = "Home Maintenance is not loaded"
-            raise HomeAssistantError(msg)
-
-        entity_registry = er.async_get(hass)
-        registry_entry = entity_registry.async_get(entity_id)
-        if registry_entry is None or registry_entry.platform != const.DOMAIN:
-            msg = f"Entity {entity_id} is not a Home Maintenance task"
-            raise HomeAssistantError(msg)
-
-        entry = cast("RegistryEntry", registry_entry)
-        task_id = entry.unique_id
-        entity = domain_data["entities"].get(task_id)
-        if entity is None:
-            msg = f"Task entity {entity_id} is not loaded"
-            raise HomeAssistantError(msg)
-
-        store = domain_data.get("store")
+    def require_store() -> TaskStore:
+        store = _store(hass)
         if store is None:
-            msg = "Home Maintenance task store is not loaded"
-            raise HomeAssistantError(msg)
-        store.update_last_performed(task_id, performed_date)
+            raise HomeAssistantError("Home Maintenance is not loaded")
+        return store
 
-    hass.services.async_register(
-        const.DOMAIN,
-        const.SERVICE_RESET,
-        async_srv_reset,
-        schema=const.SERVICE_RESET_SCHEMA,
+    async def async_srv_reset(call: ServiceCall) -> None:
+        performed_date = None
+        if value := call.data.get("performed_date"):
+            parsed = dt_util.parse_date(value)
+            if parsed is None:
+                raise HomeAssistantError(f"Could not parse performed_date: {value}")
+            performed_date = dt_util.as_local(datetime.combine(parsed, datetime.min.time()))
+        require_store().complete_task(
+            _task_id_from_entity(hass, call.data["entity_id"]), performed_date
+        )
+
+    async def async_srv_create(call: ServiceCall) -> None:
+        now = dt_util.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        task = HomeMaintenanceTask(
+            id=f"home_maintenance_{uuid.uuid4().hex}",
+            title=call.data["title"].strip(),
+            interval_value=call.data["interval_value"],
+            interval_type=call.data["interval_type"],
+            last_performed=now.isoformat(),
+            description=call.data.get("description") or None,
+            url=call.data.get("url") or None,
+            icon=call.data.get("icon") or "mdi:calendar-check",
+        )
+        require_store().add(task)
+
+    async def async_srv_complete(call: ServiceCall) -> None:
+        require_store().complete_task(_task_id_from_entity(hass, call.data["entity_id"]))
+
+    async def async_srv_snooze(call: ServiceCall) -> None:
+        require_store().snooze_task(
+            _task_id_from_entity(hass, call.data["entity_id"]), call.data["days"]
+        )
+
+    async def async_srv_skip(call: ServiceCall) -> None:
+        require_store().skip_task(_task_id_from_entity(hass, call.data["entity_id"]))
+
+    async def async_srv_delete(call: ServiceCall) -> None:
+        require_store().delete(_task_id_from_entity(hass, call.data["entity_id"]))
+
+    services = (
+        (const.SERVICE_RESET, async_srv_reset, const.SERVICE_RESET_SCHEMA),
+        (const.SERVICE_CREATE, async_srv_create, const.SERVICE_CREATE_SCHEMA),
+        (const.SERVICE_COMPLETE, async_srv_complete, const.SERVICE_ENTITY_SCHEMA),
+        (const.SERVICE_SNOOZE, async_srv_snooze, const.SERVICE_SNOOZE_SCHEMA),
+        (const.SERVICE_SKIP, async_srv_skip, const.SERVICE_ENTITY_SCHEMA),
+        (const.SERVICE_DELETE, async_srv_delete, const.SERVICE_ENTITY_SCHEMA),
     )
+    for name, handler, schema in services:
+        hass.services.async_register(const.DOMAIN, name, handler, schema=schema)
