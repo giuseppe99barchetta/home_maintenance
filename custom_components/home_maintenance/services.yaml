@@ -1,19 +1,116 @@
 reset_last_performed:
-  name: Reset Last Performed
-  description: >
-    Resets the 'last_performed' date for a maintenance task entity, and updates the 'next_due' date based on the interval.
+  name: Reset last performed
+  description: Mark a task as performed on a specific date.
   fields:
     entity_id:
       name: Entity ID
-      description: The ID of the task entity to reset.
       required: true
       selector:
         entity:
           domain: binary_sensor
+          integration: home_maintenance
     performed_date:
-      name: Performed Date
-      description: Optionally specify the date the task was last performed.
+      name: Performed date
       required: false
-      example: "2025-06-01"
       selector:
         date:
+
+create_task:
+  name: Create task
+  description: Create a recurring maintenance task.
+  fields:
+    title:
+      name: Title
+      required: true
+      selector:
+        text:
+    interval_value:
+      name: Interval
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 3650
+          mode: box
+    interval_type:
+      name: Interval type
+      required: true
+      selector:
+        select:
+          options:
+            - days
+            - weeks
+            - months
+            - years
+    description:
+      name: Description
+      required: false
+      selector:
+        text:
+          multiline: true
+    url:
+      name: Reference URL
+      required: false
+      selector:
+        text:
+    icon:
+      name: Icon
+      required: false
+      selector:
+        icon:
+
+complete_task:
+  name: Complete task
+  description: Complete a maintenance task now and add it to history.
+  fields:
+    entity_id:
+      name: Entity ID
+      required: true
+      selector:
+        entity:
+          domain: binary_sensor
+          integration: home_maintenance
+
+snooze_task:
+  name: Snooze task
+  description: Postpone the current task without changing its completion history.
+  fields:
+    entity_id:
+      name: Entity ID
+      required: true
+      selector:
+        entity:
+          domain: binary_sensor
+          integration: home_maintenance
+    days:
+      name: Days
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 3650
+          mode: box
+
+skip_task:
+  name: Skip occurrence
+  description: Skip the current occurrence without marking it complete.
+  fields:
+    entity_id:
+      name: Entity ID
+      required: true
+      selector:
+        entity:
+          domain: binary_sensor
+          integration: home_maintenance
+
+delete_task:
+  name: Delete task
+  description: Permanently delete a maintenance task.
+  fields:
+    entity_id:
+      name: Entity ID
+      required: true
+      selector:
+        entity:
+          domain: binary_sensor
+          integration: home_maintenance
