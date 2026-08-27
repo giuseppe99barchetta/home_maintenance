@@ -4,6 +4,8 @@ Keep your home in top shape by tracking recurring maintenance tasks right inside
 
 This custom integration helps you remember important chores like changing air filters, cleaning gutters, or testing smoke alarms — and shows you when they're due.
 
+Maintained by **Giuseppe Barchetta** ([@giuseppe99barchetta](https://github.com/giuseppe99barchetta)).
+
 ---
 
 ## ✨ What It Does
@@ -11,12 +13,12 @@ This custom integration helps you remember important chores like changing air fi
 - 📋 Lets you create recurring tasks (e.g., “Change HVAC filter every 90 days”)
 - 🔔 Creates entities in Home Assistant to be able to create automations and display on dashboards
 - ✅ Lets you mark tasks as completed so it can track the next due date
-- 📊 Shows tasks in a clean, easy-to-use interface built into Home Assistant
+- 📊 Shows tasks in a clean, responsive interface built into Home Assistant
 
 ---
 
 ## ⚠️ Important Note
-This integration was created to fill a simple but important gap in Home Assistant: the ability to create recurring tasks without relying on multiple helpers and automations. It is intentionally minimal by design — focused solely on task tracking.
+This integration was created to fill a simple but important gap in Home Assistant: the ability to create recurring tasks without relying on multiple helpers and automations. It is intentionally focused on recurring home-maintenance task tracking.
 
 Home Assistant already provides powerful features for dashboards, automations, and alerts, and this integration is meant to complement those, not replace them.
 
@@ -36,7 +38,7 @@ Thank you for understanding and helping keep this integration focused and mainta
 
 ## 🛠️ Installation
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=TJPoorman&repository=home_maintenance&category=Integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=giuseppe99barchetta&repository=home_maintenance&category=Integration)
 
 <details>
 <summary>Click to show installation instructions</summary>
@@ -44,13 +46,13 @@ Thank you for understanding and helping keep this integration focused and mainta
 <li>Install files:</li>
 <ul>
 <li><u>Using HACS:</u><br>
-In the HACS panel, search for 'Home Maintenance', open the repository and click 'Download'.</li>
+In HACS, add <code>https://github.com/giuseppe99barchetta/home_maintenance</code> as a custom integration repository if it is not already available, then download Home Maintenance.</li>
 <li><u>Manually:</u><br>
-Download the <a href="https://github.com/TJPoorman/home_maintenance/releases">latest release</a> as a zip file and extract it into the `custom_components` folder in your HA installation.</li>
+Download the <a href="https://github.com/giuseppe99barchetta/home_maintenance/releases">latest release</a> as a zip file and extract it into the <code>custom_components</code> folder in your Home Assistant installation.</li>
 </ul>
-<li>Restart HA to load the integration into HA.</li>
-<li>Go to Settings -> Devices & services and click 'ADD INTEGRATION' button. Look for Home Maintenance and click to add it.</li>
-<li>The Home Maintenance integration is ready for use. You can find the configuration panel in the menu on the left.</li>
+<li>Restart Home Assistant to load the integration.</li>
+<li>Go to Settings -> Devices & services and click 'ADD INTEGRATION'. Look for Home Maintenance and add it.</li>
+<li>The Home Maintenance integration is ready for use. You can find its panel in the Home Assistant sidebar.</li>
 </ol>
 </details>
 
@@ -62,13 +64,14 @@ Download the <a href="https://github.com/TJPoorman/home_maintenance/releases">la
 - To add a new task enter:
   - A title (e.g., “Clean Dryer Vent”)
   - How often it needs to be done
-  - Select the interval period (Defaults to days)
-  - The last time you did it (Optional. If omitted will be today)
-  - Select an NFC tag (Optional. Will mark the task complete when scanned)
-  - Select an icon (Optional)
+  - Select the interval period (defaults to days)
+  - The last time you did it (optional; if omitted, today is used)
+  - Select an NFC tag (optional; scanning it marks the task complete)
+  - Select an icon (optional)
+  - Select labels (optional)
   - Click **Add Task**
-- Tasks will show if they are due or overdue
-- Click **Complete** to reset the Last Performed date to today
+- Use search and status filters to find due, overdue, or later tasks.
+- Click **Complete** to reset the Last Performed date to today.
 
 ---
 
@@ -103,7 +106,7 @@ data:
 
 ## 💬 Need Help?
 
-Open an issue here on GitHub or ask in the Home Assistant community.
+Open an issue in the [GitHub issue tracker](https://github.com/giuseppe99barchetta/home_maintenance/issues) or ask in the Home Assistant community.
 
 [Home Assistant Community Thread](https://community.home-assistant.io/t/new-integration-home-maintenance-track-recurring-tasks-in-home-assistant/897324)
 
@@ -111,4 +114,4 @@ Open an issue here on GitHub or ask in the Home Assistant community.
 
 ## 📄 License
 
-MIT License – free to use, share, and improve.
+MIT License – free to use, share, and improve. Existing copyright and attribution notices remain preserved in the license file.

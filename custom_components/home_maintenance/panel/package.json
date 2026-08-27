@@ -1,25 +1,13 @@
 {
-  "name": "panel",
-  "version": "1.0.0",
-  "description": "",
-  "main": "main.js",
+  "name": "home-maintenance-panel",
+  "version": "1.5.2",
+  "private": true,
+  "description": "Frontend panel for the Home Maintenance Home Assistant integration",
   "scripts": {
-    "build": "esbuild src/main.ts --bundle --outfile=dist/main.js --format=esm --target=es2020 --minify",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "cp src/main.js dist/main.js",
+    "test": "npm run build && node --check dist/main.js && git diff --exit-code -- dist/main.js"
   },
-  "keywords": [],
-  "author": "TJPoorman",
-  "license": "ISC",
-  "devDependencies": {
-    "esbuild": "^0.25.5",
-    "lit": "^3.3.0",
-    "typescript": "^5.8.3"
-  },
-  "dependencies": {
-    "custom-card-helpers": "^1.9.0",
-    "@material/mwc-select": "latest",
-    "@material/mwc-list": "latest",
-    "@mdi/js": "7.4.47",
-    "@mdi/svg": "7.4.47"
-  }
+  "author": "Giuseppe Barchetta <giuseppe99barchetta@users.noreply.github.com>",
+  "repository": "https://github.com/giuseppe99barchetta/home_maintenance",
+  "license": "MIT"
 }

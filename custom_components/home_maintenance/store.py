@@ -20,7 +20,7 @@ STORAGE_VERSION_MINOR = 1
 
 @attr.s(slots=True)
 class HomeMaintenanceTask:
-    """Represents a single home maintenance task."""
+    """Represent a single home maintenance task."""
 
     id: str = attr.ib()
     title: str = attr.ib()
@@ -32,7 +32,7 @@ class HomeMaintenanceTask:
 
 
 class TaskStore:
-    """Class to hold home maintenance task data."""
+    """Hold and persist Home Maintenance task data."""
 
     def __init__(self, hass: HomeAssistant) -> None:
         """Initialize the storage."""
@@ -56,62 +56,57 @@ class TaskStore:
         }
 
     def get_all(self) -> list[dict]:
-        """Get all tasks."""
-        return [attr.asdict(t) for t in self._tasks.values()]
+        """Return all tasks."""
+        return [attr.asdict(task) for task in self._tasks.values()]
 
-    def get(self, task_id: str) -> dict:
-        """Get single task."""
-        return attr.asdict(self._tasks.get(task_id))
+    def get(self, task_id: str) -> dict | None:
+        """Return a single task if it exists."""
+        task = self._tasks.get(task_id)
+        return attr.asdict(task) if task is not None else None
 
     def _get_tag_uuids(self) -> dict[str, str]:
-        """Return a mapping of all task's tag friendly IDs into tag UUIDs."""
-        er = entity_registry.async_get(self.hass)
+        """Return a mapping of task tag entity IDs to tag UUIDs."""
+        registry = entity_registry.async_get(self.hass)
+        tag_ids = [task.tag_id for task in self._tasks.values() if task.tag_id]
 
-        # Get each task's tag_id, if configured
-        tag_ids = [t.tag_id for t in self._tasks.values() if t.tag_id]
-
-        tag_uuids = {}
+        tag_uuids: dict[str, str] = {}
         for tag_id in tag_ids:
-            # If two tasks have the same tag_id, only get the first
             if tag_id in tag_uuids:
                 continue
-
-            # Get the tag_id -> tag_uuid mapping from entity_registry
-            entry = er.async_get(tag_id)
+            entry = registry.async_get(tag_id)
             if entry:
                 tag_uuids[tag_id] = entry.unique_id
 
         return tag_uuids
 
     def get_by_tag_uuid(self, tag_uuid: str) -> list[dict]:
-        """Get tasks given a tag UUID."""
+        """Return tasks associated with a tag UUID."""
         tag_uuids = self._get_tag_uuids()
-
         return [
-            attr.asdict(t)
-            for t in self._tasks.values()
-            if t.tag_id and tag_uuids.get(t.tag_id) == tag_uuid
+            attr.asdict(task)
+            for task in self._tasks.values()
+            if task.tag_id and tag_uuids.get(task.tag_id) == tag_uuid
         ]
 
     def get_by_tag_id(self, tag_id: str) -> list[dict]:
-        """Get tasks by tag id."""
-        return [attr.asdict(t) for t in self._tasks.values() if t.tag_id == tag_id]
+        """Return tasks associated with a tag entity ID."""
+        return [
+            attr.asdict(task) for task in self._tasks.values() if task.tag_id == tag_id
+        ]
 
     def add(
         self, task: HomeMaintenanceTask, labels: list[str] | None = None
-    ) -> str | None:
-        """Add new task."""
+    ) -> str:
+        """Add a new task and its entity."""
         add_entities = self.hass.data[const.DOMAIN].get("add_entities")
         if not add_entities:
             msg = "add_entities not registered yet."
             raise RuntimeError(msg)
-            return None
 
         device_id = self.hass.data[const.DOMAIN].get("device_id")
         if not device_id:
             msg = "Device ID not available."
             raise RuntimeError(msg)
-            return None
 
         entity = HomeMaintenanceSensor(
             self.hass, attr.asdict(task), device_id, labels=labels
@@ -124,32 +119,29 @@ class TaskStore:
         return entity.unique_id
 
     def delete(self, task_id: str) -> None:
-        """Remove a task."""
-        er = entity_registry.async_get(self.hass)
+        """Remove a task, its entity-registry entry and in-memory entity reference."""
+        if task_id not in self._tasks:
+            msg = f"No task found with ID {task_id}."
+            raise RuntimeError(msg)
 
-        # Search for entity by unique_id
+        registry = entity_registry.async_get(self.hass)
         entity_entry = next(
             (
                 entry
-                for entry in er.entities.values()
+                for entry in registry.entities.values()
                 if entry.unique_id == task_id and entry.platform == const.DOMAIN
             ),
             None,
         )
-        if entity_entry is None:
-            msg = f"No entity found with task ID {task_id}."
-            raise RuntimeError(msg)
-            return
+        if entity_entry is not None:
+            registry.async_remove(entity_entry.entity_id)
 
-        # Remove the entity by entity_id
-        er.async_remove(entity_entry.entity_id)
-
-        # Remove from your task list and persist
-        del self._tasks[task_id]
+        self._tasks.pop(task_id, None)
+        self.hass.data[const.DOMAIN]["entities"].pop(task_id, None)
         self._save()
 
     def update_task(self, task_id: str, updated: dict) -> None:
-        """Update an existing task with new values from a dictionary."""
+        """Update an existing task and keep its Home Assistant entity in sync."""
         entity = self.hass.data[const.DOMAIN]["entities"].get(task_id)
         task = self._tasks.get(task_id)
 
@@ -158,14 +150,15 @@ class TaskStore:
             raise RuntimeError(msg)
 
         for key, value in updated.items():
-            entity.task[key] = value
+            if key == "labels":
+                continue
+            normalized_value = value or None if key == "tag_id" else value
+            entity.task[key] = normalized_value
             if hasattr(task, key):
-                setattr(task, key, value)
+                setattr(task, key, normalized_value)
 
-        if "tag_id" in updated:
-            tag_id = updated["tag_id"]
-            task.tag_id = tag_id if tag_id else None
-            entity.task["tag_id"] = tag_id if tag_id else None
+        if "title" in updated:
+            entity._attr_name = str(updated["title"])  # noqa: SLF001
 
         if "labels" in updated:
             registry = entity_registry.async_get(self.hass)
@@ -181,7 +174,7 @@ class TaskStore:
     def update_last_performed(
         self, task_id: str, performed_date: datetime | None = None
     ) -> None:
-        """Update a task's last performed date."""
+        """Update a task's last-performed date."""
         entity = self.hass.data[const.DOMAIN]["entities"].get(task_id)
         task = self._tasks.get(task_id)
 
@@ -201,7 +194,9 @@ class TaskStore:
         self._save()
 
     def _save(self) -> None:
-        """Save tasks in the background."""
+        """Persist tasks without blocking the caller."""
         self.hass.async_create_task(
-            self._store.async_save([attr.asdict(task) for task in self._tasks.values()])
+            self._store.async_save(
+                [attr.asdict(task) for task in self._tasks.values()]
+            )
         )
