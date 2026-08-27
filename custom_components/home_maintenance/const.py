@@ -4,12 +4,11 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import config_validation as cv
 
-VERSION = "1.5.2"
+VERSION = "2.0.0"
 NAME = "Home Maintenance"
-MANUFACTURER = "@TJPoorman"
+MANUFACTURER = "Giuseppe Barchetta"
 
 DOMAIN = "home_maintenance"
-
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 PANEL_FILENAME = "panel/main.js"
@@ -19,14 +18,42 @@ PANEL_API_URL = PANEL_API_PATH + "/main.js"
 PANEL_TITLE = NAME
 PANEL_ICON = "mdi:hammer-wrench"
 PANEL_NAME = "home-maintenance-panel"
-
 DEVICE_KEY = "home_maintenance_hub"
 
+EVENT_TASK_COMPLETED = f"{DOMAIN}_task_completed"
+EVENT_TASK_SKIPPED = f"{DOMAIN}_task_skipped"
+EVENT_TASK_DUE = f"{DOMAIN}_task_due"
+
 SERVICE_RESET = "reset_last_performed"
+SERVICE_CREATE = "create_task"
+SERVICE_COMPLETE = "complete_task"
+SERVICE_SNOOZE = "snooze_task"
+SERVICE_SKIP = "skip_task"
+SERVICE_DELETE = "delete_task"
+
 SERVICE_RESET_SCHEMA = vol.Schema(
     {
         vol.Required("entity_id"): cv.entity_id,
         vol.Optional("performed_date"): cv.string,
+    }
+)
+
+SERVICE_CREATE_SCHEMA = vol.Schema(
+    {
+        vol.Required("title"): cv.string,
+        vol.Required("interval_value"): vol.All(int, vol.Range(min=1)),
+        vol.Required("interval_type"): vol.In(("days", "weeks", "months", "years")),
+        vol.Optional("description"): cv.string,
+        vol.Optional("url"): cv.string,
+        vol.Optional("icon"): cv.icon,
+    }
+)
+
+SERVICE_ENTITY_SCHEMA = vol.Schema({vol.Required("entity_id"): cv.entity_id})
+SERVICE_SNOOZE_SCHEMA = vol.Schema(
+    {
+        vol.Required("entity_id"): cv.entity_id,
+        vol.Required("days"): vol.All(int, vol.Range(min=1, max=3650)),
     }
 )
 
