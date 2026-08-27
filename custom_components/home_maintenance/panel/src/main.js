@@ -1,649 +1,104 @@
-const VERSION = "1.5.2";
+const VERSION = "2.0.0";
 const DAY_MS = 86_400_000;
 
-const STRINGS = {
+const I18N = {
   en: {
-    subtitle: "Keep recurring home jobs visible, current, and easy to finish.",
-    total: "Total tasks", overdue: "Overdue", dueSoon: "Due this week", onTrack: "On track",
-    search: "Search maintenance tasks…", all: "All", newTask: "New task", addTask: "Add task",
-    taskTitle: "Task title", interval: "Interval", every: "Every", lastPerformed: "Last performed",
-    icon: "Icon", tag: "NFC tag", labels: "Labels", optional: "More options", noTag: "No tag",
-    days: "days", weeks: "weeks", months: "months", day: "day", week: "week", month: "month",
-    complete: "Complete", edit: "Edit", delete: "Delete", save: "Save changes", cancel: "Cancel",
-    editTask: "Edit task", noTasks: "No maintenance tasks yet", noTasksHint: "Add the first recurring job to start tracking your home.",
-    noMatch: "No tasks match this filter", noMatchHint: "Try another search or status filter.",
-    dueToday: "Due today", overdueBy: "Overdue by {days}d", dueIn: "Due in {days}d", dueDate: "Due {date}",
-    unknownDue: "Due date unavailable", lastDone: "Last done {date}", never: "Never completed",
-    loading: "Loading maintenance tasks…", loadError: "Could not load Home Maintenance data.", retry: "Retry",
-    required: "Add a title and a valid interval.", added: "Task added", updated: "Task updated", removed: "Task removed",
-    completed: "Task completed", actionError: "Something went wrong. Please try again.", confirmDelete: "Delete “{title}”? This cannot be undone.",
-    results: "{count} tasks", status: "Status", later: "Later", version: "Version"
+    subtitle: "Recurring maintenance, due dates and history in one place.", total: "Tasks", overdue: "Overdue", dueSoon: "Next 7 days", completed: "Completed", skipped: "Skipped", snoozed: "Snoozed",
+    search: "Search tasks…", all: "All", timeline: "Timeline", labelsView: "By label", newTask: "New task", addTask: "Add task", editTask: "Edit task",
+    title: "Title", description: "Notes / description", url: "Reference URL", interval: "Interval", every: "Every", lastPerformed: "Last performed", icon: "Icon", tag: "NFC tag", labels: "Labels", options: "Advanced options", noTag: "No tag",
+    notify: "Notify before due", notifyDays: "Days before", smartEntity: "Auto-complete entity", smartState: "Target state", days: "days", weeks: "weeks", months: "months", years: "years",
+    complete: "Complete", snooze: "Snooze 3d", skip: "Skip", history: "History", edit: "Edit", delete: "Delete", save: "Save", cancel: "Cancel", import: "Import", export: "Export", presets: "Quick presets",
+    dueToday: "Due today", overdueBy: "Overdue {days}d", dueIn: "Due in {days}d", later: "Later", unknown: "Unknown", noTasks: "No maintenance tasks yet", noTasksHint: "Use a preset or create your first recurring task.", noMatch: "Nothing matches these filters.",
+    added: "Task added", updated: "Task updated", removed: "Task removed", completedToast: "Task completed", snoozedToast: "Task snoozed", skippedToast: "Occurrence skipped", imported: "Tasks imported", error: "Something went wrong.", deleteQuestion: "Delete this task permanently?", deleteCopy: "History and settings for this task will be removed.", close: "Close", never: "Never", unlabelled: "Unlabelled", results: "{count} tasks",
   },
   it: {
-    subtitle: "Tieni sotto controllo le manutenzioni ricorrenti di casa, senza dimenticarne nessuna.",
-    total: "Attività totali", overdue: "Scadute", dueSoon: "Entro 7 giorni", onTrack: "In regola",
-    search: "Cerca attività di manutenzione…", all: "Tutte", newTask: "Nuova attività", addTask: "Aggiungi attività",
-    taskTitle: "Titolo attività", interval: "Intervallo", every: "Ogni", lastPerformed: "Ultima esecuzione",
-    icon: "Icona", tag: "Tag NFC", labels: "Etichette", optional: "Altre opzioni", noTag: "Nessun tag",
-    days: "giorni", weeks: "settimane", months: "mesi", day: "giorno", week: "settimana", month: "mese",
-    complete: "Completa", edit: "Modifica", delete: "Elimina", save: "Salva modifiche", cancel: "Annulla",
-    editTask: "Modifica attività", noTasks: "Nessuna manutenzione ancora", noTasksHint: "Aggiungi la prima attività ricorrente per iniziare a tenere traccia della casa.",
-    noMatch: "Nessuna attività corrisponde ai filtri", noMatchHint: "Prova una ricerca o un filtro diverso.",
-    dueToday: "Scade oggi", overdueBy: "Scaduta da {days}g", dueIn: "Tra {days}g", dueDate: "Scade {date}",
-    unknownDue: "Scadenza non disponibile", lastDone: "Ultima volta {date}", never: "Mai completata",
-    loading: "Caricamento manutenzioni…", loadError: "Impossibile caricare i dati di Home Maintenance.", retry: "Riprova",
-    required: "Inserisci un titolo e un intervallo valido.", added: "Attività aggiunta", updated: "Attività aggiornata", removed: "Attività eliminata",
-    completed: "Attività completata", actionError: "Qualcosa è andato storto. Riprova.", confirmDelete: "Eliminare “{title}”? L'operazione non può essere annullata.",
-    results: "{count} attività", status: "Stato", later: "Più avanti", version: "Versione"
+    subtitle: "Manutenzioni ricorrenti, scadenze e storico in un unico posto.", total: "Attività", overdue: "Scadute", dueSoon: "Prossimi 7 giorni", completed: "Completate", skipped: "Saltate", snoozed: "Rimandate",
+    search: "Cerca attività…", all: "Tutte", timeline: "Timeline", labelsView: "Per etichetta", newTask: "Nuova attività", addTask: "Aggiungi", editTask: "Modifica attività",
+    title: "Titolo", description: "Note / descrizione", url: "Link di riferimento", interval: "Intervallo", every: "Ogni", lastPerformed: "Ultima esecuzione", icon: "Icona", tag: "Tag NFC", labels: "Etichette", options: "Opzioni avanzate", noTag: "Nessun tag",
+    notify: "Notifica prima della scadenza", notifyDays: "Giorni prima", smartEntity: "Entità per completamento automatico", smartState: "Stato da raggiungere", days: "giorni", weeks: "settimane", months: "mesi", years: "anni",
+    complete: "Completa", snooze: "Rimanda 3g", skip: "Salta", history: "Storico", edit: "Modifica", delete: "Elimina", save: "Salva", cancel: "Annulla", import: "Importa", export: "Esporta", presets: "Preset rapidi",
+    dueToday: "Scade oggi", overdueBy: "Scaduta da {days}g", dueIn: "Tra {days}g", later: "Più avanti", unknown: "Sconosciuta", noTasks: "Nessuna manutenzione ancora", noTasksHint: "Usa un preset o crea la prima attività ricorrente.", noMatch: "Nessuna attività corrisponde ai filtri.",
+    added: "Attività aggiunta", updated: "Attività aggiornata", removed: "Attività eliminata", completedToast: "Attività completata", snoozedToast: "Attività rimandata", skippedToast: "Occorrenza saltata", imported: "Attività importate", error: "Qualcosa è andato storto.", deleteQuestion: "Eliminare definitivamente questa attività?", deleteCopy: "Storico e impostazioni dell'attività verranno rimossi.", close: "Chiudi", never: "Mai", unlabelled: "Senza etichetta", results: "{count} attività",
   },
-  de: {
-    subtitle: "Wiederkehrende Hausarbeiten im Blick behalten und rechtzeitig erledigen.",
-    total: "Aufgaben gesamt", overdue: "Überfällig", dueSoon: "Diese Woche fällig", onTrack: "Im Plan",
-    search: "Wartungsaufgaben suchen…", all: "Alle", newTask: "Neue Aufgabe", addTask: "Aufgabe hinzufügen",
-    taskTitle: "Aufgabentitel", interval: "Intervall", every: "Alle", lastPerformed: "Zuletzt erledigt",
-    icon: "Symbol", tag: "NFC-Tag", labels: "Labels", optional: "Weitere Optionen", noTag: "Kein Tag",
-    days: "Tage", weeks: "Wochen", months: "Monate", day: "Tag", week: "Woche", month: "Monat",
-    complete: "Erledigen", edit: "Bearbeiten", delete: "Löschen", save: "Änderungen speichern", cancel: "Abbrechen",
-    editTask: "Aufgabe bearbeiten", noTasks: "Noch keine Wartungsaufgaben", noTasksHint: "Füge die erste wiederkehrende Aufgabe hinzu.",
-    noMatch: "Keine Aufgaben entsprechen dem Filter", noMatchHint: "Versuche eine andere Suche oder einen anderen Filter.",
-    dueToday: "Heute fällig", overdueBy: "Seit {days} T. überfällig", dueIn: "In {days} T. fällig", dueDate: "Fällig {date}",
-    unknownDue: "Fälligkeit unbekannt", lastDone: "Zuletzt {date}", never: "Nie erledigt",
-    loading: "Wartungsaufgaben werden geladen…", loadError: "Home-Maintenance-Daten konnten nicht geladen werden.", retry: "Erneut versuchen",
-    required: "Titel und gültiges Intervall angeben.", added: "Aufgabe hinzugefügt", updated: "Aufgabe aktualisiert", removed: "Aufgabe gelöscht",
-    completed: "Aufgabe erledigt", actionError: "Etwas ist schiefgelaufen. Bitte erneut versuchen.", confirmDelete: "„{title}“ löschen? Dies kann nicht rückgängig gemacht werden.",
-    results: "{count} Aufgaben", status: "Status", later: "Später", version: "Version"
-  }
 };
 
 const CSS = `
-  :host {
-    display: block;
-    min-height: 100vh;
-    color: var(--primary-text-color, #e8eaed);
-    background: var(--lovelace-background, var(--primary-background-color, #0f1115));
-    font-family: var(--paper-font-body1_-_font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
-    --hm-surface: var(--card-background-color, #181b20);
-    --hm-surface-2: color-mix(in srgb, var(--card-background-color, #181b20) 88%, var(--primary-text-color, #fff) 12%);
-    --hm-border: color-mix(in srgb, var(--divider-color, #ffffff1f) 72%, transparent);
-    --hm-muted: var(--secondary-text-color, #9aa0a6);
-    --hm-accent: var(--primary-color, #03a9f4);
-    --hm-danger: var(--error-color, #db4437);
-    --hm-success: var(--success-color, #43a047);
-    box-sizing: border-box;
-  }
-  *, *::before, *::after { box-sizing: border-box; }
-  button, input, select { font: inherit; }
-  button { color: inherit; }
-  .app-header {
-    position: sticky; top: 0; z-index: 20;
-    min-height: var(--header-height, 56px);
-    display: flex; align-items: center; gap: 14px;
-    padding: 0 20px;
-    background: color-mix(in srgb, var(--app-header-background-color, var(--hm-surface)) 92%, transparent);
-    color: var(--app-header-text-color, var(--primary-text-color));
-    border-bottom: 1px solid var(--hm-border);
-    backdrop-filter: blur(16px);
-  }
-  .title-block { min-width: 0; flex: 1; }
-  .title { font-size: 18px; line-height: 1.2; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .header-version { color: var(--hm-muted); font-size: 12px; font-weight: 600; }
-  .header-action {
-    border: 0; border-radius: 10px; padding: 9px 13px; cursor: pointer;
-    background: var(--hm-accent); color: var(--text-primary-color, #fff); font-weight: 650;
-  }
-  .page { max-width: 1480px; margin: 0 auto; padding: 28px 24px 48px; }
-  .hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
-  .hero h1 { margin: 0 0 6px; font-size: clamp(26px, 3vw, 38px); line-height: 1.08; letter-spacing: -0.035em; }
-  .hero p { margin: 0; max-width: 720px; color: var(--hm-muted); font-size: 15px; line-height: 1.5; }
-  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
-  .stat {
-    padding: 16px 17px; border-radius: 16px; background: var(--hm-surface); border: 1px solid var(--hm-border);
-    min-height: 92px; display: flex; flex-direction: column; justify-content: space-between;
-  }
-  .stat-label { color: var(--hm-muted); font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .045em; }
-  .stat-value { font-size: 29px; line-height: 1; font-weight: 720; letter-spacing: -.03em; }
-  .stat.overdue .stat-value { color: var(--hm-danger); }
-  .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 390px); gap: 18px; align-items: start; }
-  .panel { background: var(--hm-surface); border: 1px solid var(--hm-border); border-radius: 18px; overflow: hidden; }
-  .panel-head { padding: 16px; border-bottom: 1px solid var(--hm-border); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-  .search-wrap { position: relative; flex: 1 1 260px; }
-  .search-wrap::before { content: "⌕"; position: absolute; left: 12px; top: 50%; transform: translateY(-53%); color: var(--hm-muted); font-size: 19px; pointer-events: none; }
-  .search { width: 100%; height: 40px; padding: 0 12px 0 36px; border: 1px solid var(--hm-border); border-radius: 11px; outline: none; color: var(--primary-text-color); background: var(--primary-background-color, #101216); }
-  .search:focus, .field input:focus, .field select:focus { border-color: var(--hm-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--hm-accent) 22%, transparent); }
-  .filters { display: flex; gap: 6px; overflow-x: auto; }
-  .filter { border: 1px solid var(--hm-border); background: transparent; border-radius: 999px; padding: 7px 11px; color: var(--hm-muted); cursor: pointer; white-space: nowrap; font-size: 13px; font-weight: 620; }
-  .filter.active { color: var(--primary-text-color); background: var(--hm-surface-2); border-color: color-mix(in srgb, var(--hm-accent) 40%, var(--hm-border)); }
-  .list-meta { padding: 11px 16px; color: var(--hm-muted); font-size: 12px; border-bottom: 1px solid var(--hm-border); }
-  .task-list { display: flex; flex-direction: column; }
-  .task { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 13px; align-items: center; padding: 15px 16px; border-bottom: 1px solid var(--hm-border); transition: background .16s ease; }
-  .task:last-child { border-bottom: 0; }
-  .task:hover { background: color-mix(in srgb, var(--hm-surface-2) 55%, transparent); }
-  .task-icon { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; background: var(--hm-surface-2); color: var(--hm-accent); }
-  .task-icon ha-icon { --mdc-icon-size: 21px; }
-  .task-main { min-width: 0; }
-  .task-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .task-title { font-size: 15px; font-weight: 680; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .badge { display: inline-flex; align-items: center; min-height: 22px; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 1.2; background: var(--hm-surface-2); color: var(--hm-muted); }
-  .badge.overdue { color: var(--hm-danger); background: color-mix(in srgb, var(--hm-danger) 13%, transparent); }
-  .badge.today, .badge.soon { color: var(--warning-color, #f9ab00); background: color-mix(in srgb, var(--warning-color, #f9ab00) 13%, transparent); }
-  .task-meta { margin-top: 5px; color: var(--hm-muted); font-size: 12.5px; line-height: 1.45; display: flex; gap: 7px; flex-wrap: wrap; }
-  .labels { margin-top: 7px; display: flex; gap: 5px; flex-wrap: wrap; }
-  .label-chip { font-size: 10.5px; padding: 2px 7px; border-radius: 6px; background: var(--hm-surface-2); color: var(--hm-muted); }
-  .task-actions { display: flex; gap: 6px; align-items: center; }
-  .action { height: 34px; border: 1px solid var(--hm-border); background: transparent; border-radius: 9px; padding: 0 10px; cursor: pointer; font-size: 12px; font-weight: 650; }
-  .action:hover { background: var(--hm-surface-2); }
-  .action.primary { border-color: color-mix(in srgb, var(--hm-success) 35%, var(--hm-border)); color: var(--hm-success); }
-  .action.danger { color: var(--hm-danger); }
-  .action:disabled { opacity: .48; cursor: wait; }
-  .empty { padding: 64px 28px; text-align: center; }
-  .empty-icon { width: 54px; height: 54px; margin: 0 auto 14px; border-radius: 17px; display: grid; place-items: center; background: var(--hm-surface-2); font-size: 24px; }
-  .empty h3 { margin: 0 0 6px; font-size: 17px; }
-  .empty p { margin: 0 auto; max-width: 430px; color: var(--hm-muted); font-size: 13px; line-height: 1.5; }
-  .form-panel { position: sticky; top: calc(var(--header-height, 56px) + 18px); }
-  .form-title { padding: 18px 18px 4px; font-size: 18px; font-weight: 700; }
-  .form-copy { padding: 0 18px 14px; color: var(--hm-muted); font-size: 12.5px; line-height: 1.45; }
-  form { padding: 0 18px 18px; }
-  .field { margin-bottom: 13px; }
-  .field-row { display: grid; grid-template-columns: 1fr 1.25fr; gap: 10px; }
-  .field label, .field-label { display: block; margin-bottom: 6px; color: var(--hm-muted); font-size: 11.5px; font-weight: 650; }
-  .field input, .field select { width: 100%; height: 42px; padding: 0 11px; border: 1px solid var(--hm-border); border-radius: 10px; outline: none; color: var(--primary-text-color); background: var(--primary-background-color, #101216); }
-  details { border-top: 1px solid var(--hm-border); border-bottom: 1px solid var(--hm-border); margin: 4px 0 14px; padding: 0; }
-  summary { padding: 12px 0; cursor: pointer; color: var(--hm-muted); font-size: 12.5px; font-weight: 650; }
-  .details-body { padding-bottom: 4px; }
-  .label-options { display: flex; flex-wrap: wrap; gap: 7px; max-height: 124px; overflow: auto; padding: 2px 1px 5px; }
-  .label-option { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--hm-border); border-radius: 8px; padding: 6px 8px; font-size: 11.5px; color: var(--hm-muted); cursor: pointer; }
-  .label-option input { width: auto; height: auto; margin: 0; }
-  .submit { width: 100%; min-height: 43px; border: 0; border-radius: 11px; background: var(--hm-accent); color: var(--text-primary-color, #fff); cursor: pointer; font-weight: 700; }
-  .submit:disabled { opacity: .55; cursor: wait; }
-  .loading { min-height: 320px; display: grid; place-items: center; color: var(--hm-muted); }
-  .error-box { margin: 36px auto; max-width: 560px; padding: 22px; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--hm-danger) 40%, var(--hm-border)); background: var(--hm-surface); text-align: center; }
-  .error-box p { color: var(--hm-muted); }
-  .secondary { border: 1px solid var(--hm-border); background: var(--hm-surface-2); border-radius: 9px; padding: 8px 12px; cursor: pointer; }
-  .modal-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.58); display: grid; place-items: center; padding: 18px; }
-  .modal { width: min(580px, 100%); max-height: min(760px, calc(100vh - 36px)); overflow: auto; background: var(--hm-surface); border: 1px solid var(--hm-border); border-radius: 18px; box-shadow: 0 24px 70px rgba(0,0,0,.35); }
-  .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 17px 18px; border-bottom: 1px solid var(--hm-border); }
-  .modal-title { font-size: 17px; font-weight: 700; }
-  .modal-close { border: 0; background: transparent; color: var(--hm-muted); font-size: 22px; cursor: pointer; }
-  .modal form { padding-top: 17px; }
-  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-  .modal-actions .submit { width: auto; padding: 0 18px; }
-  .toast { position: fixed; z-index: 100; right: 22px; bottom: 22px; max-width: min(380px, calc(100vw - 32px)); padding: 11px 14px; border-radius: 11px; background: #262a31; color: #fff; box-shadow: 0 12px 35px rgba(0,0,0,.28); opacity: 0; transform: translateY(8px); pointer-events: none; transition: .18s ease; font-size: 13px; }
-  .toast.show { opacity: 1; transform: translateY(0); }
-  .toast.error { background: color-mix(in srgb, var(--hm-danger) 80%, #222); }
-  @media (max-width: 980px) {
-    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .layout { grid-template-columns: 1fr; }
-    .form-panel { position: static; order: -1; }
-  }
-  @media (max-width: 640px) {
-    .app-header { padding: 0 12px; }
-    .header-version { display: none; }
-    .page { padding: 20px 12px 32px; }
-    .hero { align-items: flex-start; }
-    .hero .header-action { display: none; }
-    .stats { gap: 8px; }
-    .stat { min-height: 80px; padding: 13px; border-radius: 14px; }
-    .stat-value { font-size: 25px; }
-    .panel { border-radius: 15px; }
-    .panel-head { padding: 12px; }
-    .task { grid-template-columns: 40px minmax(0, 1fr); padding: 14px 12px; }
-    .task-icon { width: 38px; height: 38px; border-radius: 11px; }
-    .task-actions { grid-column: 1 / -1; padding-left: 53px; }
-    .action { flex: 1; }
-    .field-row { grid-template-columns: 1fr; gap: 0; }
-    .toast { left: 16px; right: 16px; bottom: 16px; }
-  }
+:host{display:block;min-height:100vh;background:var(--primary-background-color,#101216);color:var(--primary-text-color,#eee);font-family:var(--paper-font-body1_-_font-family,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif);--s:var(--card-background-color,#181b20);--s2:color-mix(in srgb,var(--s) 88%,var(--primary-text-color,#fff) 12%);--b:color-mix(in srgb,var(--divider-color,#ffffff20) 78%,transparent);--m:var(--secondary-text-color,#9aa0a6);--a:var(--primary-color,#03a9f4);--ok:var(--success-color,#43a047);--warn:var(--warning-color,#f9ab00);--bad:var(--error-color,#db4437);box-sizing:border-box}*{box-sizing:border-box}button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}.top{position:sticky;top:0;z-index:20;height:56px;display:flex;align-items:center;gap:12px;padding:0 18px;background:color-mix(in srgb,var(--s) 92%,transparent);backdrop-filter:blur(16px);border-bottom:1px solid var(--b)}.top-title{flex:1;min-width:0;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.version{font-size:12px;color:var(--m)}.page{max-width:1500px;margin:auto;padding:26px 22px 60px}.hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;margin-bottom:18px}.hero h1{font-size:clamp(28px,3vw,40px);letter-spacing:-.035em;margin:0 0 6px}.hero p{margin:0;color:var(--m);max-width:700px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.btn,.chip{border:1px solid var(--b);background:transparent;border-radius:10px;padding:9px 12px;font-weight:650}.btn:hover,.chip:hover{background:var(--s2)}.btn.primary{background:var(--a);border-color:var(--a);color:var(--text-primary-color,#fff)}.btn.danger{color:var(--bad)}.stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:16px}.stat{background:var(--s);border:1px solid var(--b);border-radius:15px;padding:14px;min-height:82px;display:flex;flex-direction:column;justify-content:space-between}.stat span:first-child{font-size:11px;color:var(--m);text-transform:uppercase;letter-spacing:.05em;font-weight:700}.stat strong{font-size:26px}.stat.bad strong{color:var(--bad)}.workspace{display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:16px;align-items:start}.panel{background:var(--s);border:1px solid var(--b);border-radius:18px;overflow:hidden}.panel-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px;border-bottom:1px solid var(--b)}.search{flex:1 1 240px;min-width:180px;height:40px;border:1px solid var(--b);background:var(--primary-background-color);border-radius:10px;padding:0 12px;outline:none}.search:focus,input:focus,select:focus,textarea:focus{border-color:var(--a);box-shadow:0 0 0 2px color-mix(in srgb,var(--a) 22%,transparent);outline:none}.seg{display:flex;gap:5px;overflow:auto}.chip{padding:7px 10px;border-radius:999px;color:var(--m);white-space:nowrap;font-size:12px}.chip.active{background:var(--s2);color:var(--primary-text-color);border-color:color-mix(in srgb,var(--a) 40%,var(--b))}.meta{padding:10px 14px;color:var(--m);font-size:12px;border-bottom:1px solid var(--b)}.group-title{display:flex;align-items:center;gap:8px;padding:12px 14px;background:color-mix(in srgb,var(--s2) 55%,transparent);border-bottom:1px solid var(--b);font-size:12px;font-weight:750;text-transform:uppercase;letter-spacing:.04em}.count{background:var(--s);border:1px solid var(--b);border-radius:999px;padding:2px 7px;color:var(--m)}.task{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;padding:14px;border-bottom:1px solid var(--b)}.task:last-child{border-bottom:0}.task:hover{background:color-mix(in srgb,var(--s2) 42%,transparent)}.ico{width:42px;height:42px;border-radius:12px;background:var(--s2);display:grid;place-items:center;color:var(--a)}.main{min-width:0}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.task-title{font-weight:720;min-width:0}.badge{font-size:11px;font-weight:750;border-radius:999px;padding:3px 8px;background:var(--s2);color:var(--m)}.badge.overdue{color:var(--bad);background:color-mix(in srgb,var(--bad) 13%,transparent)}.badge.today,.badge.soon{color:var(--warn);background:color-mix(in srgb,var(--warn) 13%,transparent)}.desc{margin-top:5px;color:var(--m);font-size:13px;line-height:1.4}.desc a{color:var(--a)}.task-meta{margin-top:6px;color:var(--m);font-size:12px;display:flex;gap:7px;flex-wrap:wrap}.labels{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}.label{font-size:10.5px;padding:2px 7px;background:var(--s2);border-radius:6px;color:var(--m)}.actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.action{border:1px solid var(--b);background:transparent;border-radius:8px;padding:6px 9px;font-size:11.5px;font-weight:700}.action:hover{background:var(--s2)}.action.complete{color:var(--ok)}.action.delete{color:var(--bad)}.form-panel{position:sticky;top:72px}.form-head{padding:16px;border-bottom:1px solid var(--b)}.form-head h2{margin:0 0 4px;font-size:18px}.form-head p{margin:0;color:var(--m);font-size:12px}.form{padding:16px}.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}.field label,.field-label{font-size:11px;font-weight:750;color:var(--m);text-transform:uppercase;letter-spacing:.04em}.field input,.field select,.field textarea{width:100%;border:1px solid var(--b);border-radius:9px;background:var(--primary-background-color);padding:9px 10px}.field textarea{min-height:72px;resize:vertical}.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.checks{display:flex;gap:6px;flex-wrap:wrap}.check{display:flex;align-items:center;gap:6px;background:var(--s2);border-radius:8px;padding:6px 8px;font-size:11px}.advanced{border:1px solid var(--b);border-radius:10px;margin:12px 0}.advanced summary{padding:10px 12px;cursor:pointer;font-size:12px;font-weight:700}.advanced-body{padding:0 12px 12px}.preset-wrap{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 14px}.preset{border:1px solid var(--b);background:transparent;border-radius:999px;padding:6px 9px;font-size:11px}.empty{padding:54px 24px;text-align:center}.empty h3{margin:0 0 6px}.empty p{color:var(--m);margin:0}.modal-bg{position:fixed;inset:0;z-index:50;background:#0009;display:grid;place-items:center;padding:18px}.modal{width:min(620px,100%);max-height:90vh;overflow:auto;background:var(--s);border:1px solid var(--b);border-radius:18px;box-shadow:0 24px 80px #0008}.modal-head{display:flex;align-items:center;gap:10px;padding:15px;border-bottom:1px solid var(--b)}.modal-head h2{margin:0;font-size:17px;flex:1}.modal-body{padding:16px}.modal-actions{display:flex;justify-content:flex-end;gap:8px;padding:14px 16px;border-top:1px solid var(--b)}.history-list{display:flex;flex-direction:column;gap:8px}.history-item{padding:9px 10px;border:1px solid var(--b);border-radius:9px;display:flex;justify-content:space-between;gap:10px}.history-item.skip{color:var(--m)}.toast{position:fixed;right:18px;bottom:18px;z-index:80;background:var(--s);border:1px solid var(--b);border-radius:10px;padding:10px 13px;box-shadow:0 10px 30px #0005;opacity:0;transform:translateY(10px);pointer-events:none;transition:.18s}.toast.show{opacity:1;transform:none}.loading{padding:70px;text-align:center;color:var(--m)}.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}@media(max-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}.workspace{grid-template-columns:1fr}.form-panel{position:static}}@media(max-width:650px){.page{padding:18px 10px 40px}.hero{align-items:flex-start;flex-direction:column}.stats{grid-template-columns:repeat(2,1fr)}.top{padding:0 10px}.task{grid-template-columns:38px minmax(0,1fr);padding:12px 10px}.ico{width:36px;height:36px}.field-row{grid-template-columns:1fr}.toolbar .btn{padding:8px}.actions{gap:5px}.action{flex:1 1 auto}.form{padding:12px}.panel-head{padding:10px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 `;
 
-function esc(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
-  })[char]);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+const parseDate = (v) => { if (!v) return null; const d = new Date(v); return Number.isNaN(d.getTime()) ? null : d; };
+const localInput = (v = new Date()) => { const d = v instanceof Date ? v : parseDate(v); if (!d) return ""; const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; };
+const dayNum = (d) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY_MS;
+
+function addInterval(date, value, type) {
+  const d = new Date(date);
+  if (type === "days") d.setDate(d.getDate() + value);
+  else if (type === "weeks") d.setDate(d.getDate() + value * 7);
+  else if (type === "months") {
+    const day = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + value); const max = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); d.setDate(Math.min(day, max));
+  } else if (type === "years") {
+    const month = d.getMonth(), day = d.getDate(); d.setDate(1); d.setFullYear(d.getFullYear() + value); d.setMonth(month); const max = new Date(d.getFullYear(), month + 1, 0).getDate(); d.setDate(Math.min(day, max));
+  }
+  d.setHours(0,0,0,0); return d;
 }
 
-function localDateInput(date = new Date()) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function parseLocalDate(value) {
-  if (!value) return null;
-  const match = String(value).split("T")[0].match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return null;
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  if (date.getFullYear() !== Number(match[1]) || date.getMonth() !== Number(match[2]) - 1 || date.getDate() !== Number(match[3])) return null;
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function dateToIso(value) {
-  const date = parseLocalDate(value) || new Date();
-  date.setHours(0, 0, 0, 0);
-  return date.toISOString();
-}
-
-function addMonthsClamped(date, months) {
-  const day = date.getDate();
-  const target = new Date(date.getFullYear(), date.getMonth() + months, 1);
-  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-  target.setDate(Math.min(day, lastDay));
-  target.setHours(0, 0, 0, 0);
-  return target;
-}
-
-function calculateDue(task) {
-  const last = parseLocalDate(task.last_performed);
-  const value = Number(task.interval_value);
-  if (!last || !Number.isFinite(value) || value < 1) return null;
-  if (task.interval_type === "days") return new Date(last.getFullYear(), last.getMonth(), last.getDate() + value);
-  if (task.interval_type === "weeks") return new Date(last.getFullYear(), last.getMonth(), last.getDate() + value * 7);
-  if (task.interval_type === "months") return addMonthsClamped(last, value);
-  return null;
-}
-
-function dayNumber(date) {
-  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS;
+function dueDate(task) {
+  let due = task.next_due_override ? parseDate(task.next_due_override) : null;
+  if (!due) { const last = parseDate(task.last_performed); if (!last) return null; due = addInterval(last, Number(task.interval_value), task.interval_type); }
+  const snooze = parseDate(task.snoozed_until); if (snooze && snooze > due) due = snooze;
+  due.setHours(0,0,0,0); return due;
 }
 
 class HomeMaintenancePanel extends HTMLElement {
-  constructor() {
-    super();
-    this.attachShadow({ mode: "open" });
-    this._hass = null;
-    this._narrow = false;
-    this._tasks = [];
-    this._config = null;
-    this._registry = [];
-    this._labels = [];
-    this._loading = true;
-    this._loadError = false;
-    this._search = "";
-    this._filter = "all";
-    this._editingId = null;
-    this._busyId = null;
-    this._toastTimer = null;
-
-    this.shadowRoot.addEventListener("click", (event) => this._onClick(event));
-    this.shadowRoot.addEventListener("input", (event) => this._onInput(event));
-    this.shadowRoot.addEventListener("submit", (event) => this._onSubmit(event));
+  constructor(){
+    super(); this.attachShadow({mode:"open"}); this._hass=null; this._loaded=false; this._tasks=[]; this._registry=[]; this._labels=[]; this._presets=[]; this._serverStats={}; this._config={}; this._search=""; this._filter="all"; this._view="timeline"; this._editing=null; this._history=null; this._deleting=null; this._busy=null; this._toastTimer=null;
   }
-
-  set hass(value) {
-    const first = !this._hass;
-    this._hass = value;
-    if (this.isConnected && first) this._loadData();
-    this._wireHassElements();
-  }
-  get hass() { return this._hass; }
-
-  set narrow(value) {
-    const changed = this._narrow !== Boolean(value);
-    this._narrow = Boolean(value);
-    if (changed && this.isConnected) this._render();
-  }
-  get narrow() { return this._narrow; }
-
-  connectedCallback() {
-    this._render();
-    if (this._hass) this._loadData();
-  }
-
-  _lang() {
-    const raw = this._hass?.language || navigator.language || "en";
-    const lang = String(raw).toLowerCase().split("-")[0];
-    return STRINGS[lang] ? lang : "en";
-  }
-
-  _t(key, vars = {}) {
-    let text = STRINGS[this._lang()]?.[key] ?? STRINGS.en[key] ?? key;
-    for (const [name, value] of Object.entries(vars)) text = text.replaceAll(`{${name}}`, String(value));
-    return text;
-  }
-
-  _formatDate(date) {
-    if (!date) return "—";
-    try { return new Intl.DateTimeFormat(this._hass?.locale?.language || this._hass?.language || undefined, { dateStyle: "medium" }).format(date); }
-    catch { return localDateInput(date); }
-  }
-
-  _status(task) {
-    const due = calculateDue(task);
-    if (!due) return { kind: "unknown", diff: null, due: null, label: this._t("unknownDue") };
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const diff = dayNumber(due) - dayNumber(today);
-    if (diff < 0) return { kind: "overdue", diff, due, label: this._t("overdueBy", { days: Math.abs(diff) }) };
-    if (diff === 0) return { kind: "today", diff, due, label: this._t("dueToday") };
-    if (diff <= 7) return { kind: "soon", diff, due, label: this._t("dueIn", { days: diff }) };
-    return { kind: "later", diff, due, label: this._t("dueDate", { date: this._formatDate(due) }) };
-  }
-
-  _taskLabels(task) {
-    const entity = this._registry.find((item) => item.unique_id === task.id);
-    const ids = Array.isArray(entity?.labels) ? entity.labels : [];
-    return ids.map((id) => this._labels.find((label) => label.label_id === id)).filter(Boolean);
-  }
-
-  _tagOptions() {
-    if (!this._hass?.states) return [];
-    return Object.entries(this._hass.states)
-      .filter(([entityId]) => entityId.startsWith("tag."))
-      .map(([entityId, state]) => ({ id: entityId, name: state.attributes?.friendly_name || entityId.replace("tag.", "") }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  async _loadData() {
-    if (!this._hass) return;
-    this._loading = true;
-    this._loadError = false;
-    this._render();
-    try {
-      const [tasks, config, registry, labels] = await Promise.all([
-        this._hass.callWS({ type: "home_maintenance/get_tasks" }),
-        this._hass.callWS({ type: "home_maintenance/get_config" }),
-        this._hass.callWS({ type: "config/entity_registry/list" }),
-        this._hass.callWS({ type: "config/label_registry/list" }),
+  set hass(value){ this._hass=value; if(!this._loaded){this._loaded=true;this._load();} else this._wireMenu(); }
+  set narrow(_v){}
+  set route(_v){}
+  set panel(_v){}
+  _lang(){ return (this._hass?.locale?.language || this._hass?.language || "en").split("-")[0] === "it" ? "it" : "en"; }
+  _t(k,vars={}){ let s=I18N[this._lang()][k] ?? I18N.en[k] ?? k; for(const [a,b] of Object.entries(vars)) s=s.replaceAll(`{${a}}`,String(b)); return s; }
+  _date(v){ const d=v instanceof Date?v:parseDate(v); if(!d)return "—"; try{return new Intl.DateTimeFormat(this._hass?.locale?.language||undefined,{dateStyle:"medium"}).format(d)}catch{return localInput(d)} }
+  _status(task){ const d=dueDate(task); if(!d)return {kind:"unknown",delta:null,label:this._t("unknown"),due:null}; const today=new Date();today.setHours(0,0,0,0);const delta=dayNum(d)-dayNum(today); if(delta<0)return{kind:"overdue",delta,label:this._t("overdueBy",{days:Math.abs(delta)}),due:d};if(delta===0)return{kind:"today",delta,label:this._t("dueToday"),due:d};if(delta<=7)return{kind:"soon",delta,label:this._t("dueIn",{days:delta}),due:d};return{kind:"later",delta,label:this._date(d),due:d}; }
+  _labelsFor(task){ const ent=this._registry.find((e)=>e.unique_id===task.id); const ids=Array.isArray(ent?.labels)?ent.labels:[]; return ids.map((id)=>this._labels.find((l)=>l.label_id===id)).filter(Boolean); }
+  _tagOptions(){ return Object.entries(this._hass?.states||{}).filter(([id])=>id.startsWith("tag.")).map(([id,s])=>({id,name:s.attributes?.friendly_name||id})).sort((a,b)=>a.name.localeCompare(b.name)); }
+  _entityOptions(){ return Object.entries(this._hass?.states||{}).map(([id,s])=>({id,name:s.attributes?.friendly_name||id})).sort((a,b)=>a.name.localeCompare(b.name)); }
+  async _load(){
+    this._renderLoading();
+    try{
+      const [tasks,config,registry,labels,presets,stats]=await Promise.all([
+        this._hass.callWS({type:"home_maintenance/get_tasks"}),this._hass.callWS({type:"home_maintenance/get_config"}),this._hass.callWS({type:"config/entity_registry/list"}),this._hass.callWS({type:"config/label_registry/list"}),this._hass.callWS({type:"home_maintenance/presets"}),this._hass.callWS({type:"home_maintenance/statistics"})
       ]);
-      this._tasks = Array.isArray(tasks) ? tasks : [];
-      this._config = config || null;
-      this._registry = Array.isArray(registry) ? registry : [];
-      this._labels = Array.isArray(labels) ? labels : [];
-    } catch (error) {
-      console.error("Home Maintenance: failed to load panel data", error);
-      this._loadError = true;
-    } finally {
-      this._loading = false;
-      this._render();
-    }
+      this._tasks=Array.isArray(tasks)?tasks:[];this._config=config||{};this._registry=Array.isArray(registry)?registry:[];this._labels=Array.isArray(labels)?labels:[];this._presets=Array.isArray(presets)?presets:[];this._serverStats=stats||{};this._render();
+    }catch(e){console.error(e);this.shadowRoot.innerHTML=`<style>${CSS}</style><div class="loading">${esc(this._t("error"))} <button class="btn" id="retry">Retry</button></div>`;this.shadowRoot.querySelector("#retry")?.addEventListener("click",()=>this._load());}
   }
-
-  _stats() {
-    const statuses = this._tasks.map((task) => this._status(task));
-    return {
-      total: this._tasks.length,
-      overdue: statuses.filter((s) => s.kind === "overdue").length,
-      soon: statuses.filter((s) => s.kind === "today" || s.kind === "soon").length,
-      track: statuses.filter((s) => s.kind === "later").length,
-    };
-  }
-
-  _filteredTasks() {
-    const query = this._search.trim().toLocaleLowerCase();
-    return [...this._tasks]
-      .filter((task) => {
-        if (query && !String(task.title || "").toLocaleLowerCase().includes(query)) return false;
-        const status = this._status(task);
-        if (this._filter === "overdue" && status.kind !== "overdue") return false;
-        if (this._filter === "soon" && !["today", "soon"].includes(status.kind)) return false;
-        if (this._filter === "later" && status.kind !== "later") return false;
-        return true;
-      })
-      .sort((a, b) => {
-        const ad = calculateDue(a); const bd = calculateDue(b);
-        if (!ad && !bd) return String(a.title).localeCompare(String(b.title));
-        if (!ad) return 1; if (!bd) return -1;
-        return ad.getTime() - bd.getTime();
-      });
-  }
-
-  _intervalLabel(task) {
-    const value = Number(task.interval_value);
-    const singularKey = task.interval_type === "days" ? "day" : task.interval_type === "weeks" ? "week" : "month";
-    const pluralKey = task.interval_type === "days" ? "days" : task.interval_type === "weeks" ? "weeks" : "months";
-    return `${this._t("every")} ${value} ${this._t(value === 1 ? singularKey : pluralKey)}`;
-  }
-
-  _labelOptions(selected = []) {
-    if (!this._labels.length) return `<span class="field-label">—</span>`;
-    const selectedSet = new Set(selected);
-    return `<div class="label-options">${this._labels.map((label) => `
-      <label class="label-option"><input type="checkbox" name="labels" value="${esc(label.label_id)}" ${selectedSet.has(label.label_id) ? "checked" : ""}>${esc(label.name)}</label>
-    `).join("")}</div>`;
-  }
-
-  _tagSelect(selected = "") {
-    const options = this._tagOptions();
-    return `<select name="tag_id"><option value="">${esc(this._t("noTag"))}</option>${options.map((tag) => `<option value="${esc(tag.id)}" ${tag.id === selected ? "selected" : ""}>${esc(tag.name)}</option>`).join("")}</select>`;
-  }
-
-  _taskMarkup(task) {
-    const status = this._status(task);
-    const last = parseLocalDate(task.last_performed);
-    const labels = this._taskLabels(task);
-    const busy = this._busyId === task.id;
-    return `<article class="task">
-      <div class="task-icon"><ha-icon icon="${esc(task.icon || "mdi:calendar-check")}"></ha-icon></div>
-      <div class="task-main">
-        <div class="task-top"><div class="task-title">${esc(task.title)}</div><span class="badge ${esc(status.kind)}">${esc(status.label)}</span></div>
-        <div class="task-meta"><span>${esc(this._intervalLabel(task))}</span><span>•</span><span>${esc(last ? this._t("lastDone", { date: this._formatDate(last) }) : this._t("never"))}</span></div>
-        ${labels.length ? `<div class="labels">${labels.map((label) => `<span class="label-chip">${esc(label.name)}</span>`).join("")}</div>` : ""}
-      </div>
-      <div class="task-actions">
-        <button class="action primary" type="button" data-action="complete" data-id="${esc(task.id)}" ${busy ? "disabled" : ""}>✓ ${esc(this._t("complete"))}</button>
-        <button class="action" type="button" data-action="edit" data-id="${esc(task.id)}" ${busy ? "disabled" : ""}>${esc(this._t("edit"))}</button>
-        <button class="action danger" type="button" data-action="delete" data-id="${esc(task.id)}" ${busy ? "disabled" : ""}>${esc(this._t("delete"))}</button>
-      </div>
-    </article>`;
-  }
-
-  _tasksMarkup() {
-    const tasks = this._filteredTasks();
-    if (!this._tasks.length) return `<div class="empty"><div class="empty-icon">⌂</div><h3>${esc(this._t("noTasks"))}</h3><p>${esc(this._t("noTasksHint"))}</p></div>`;
-    if (!tasks.length) return `<div class="empty"><div class="empty-icon">⌕</div><h3>${esc(this._t("noMatch"))}</h3><p>${esc(this._t("noMatchHint"))}</p></div>`;
-    return `<div class="task-list">${tasks.map((task) => this._taskMarkup(task)).join("")}</div>`;
-  }
-
-  _addFormMarkup() {
-    return `<aside class="panel form-panel" id="new-task-card">
-      <div class="form-title">${esc(this._t("newTask"))}</div>
-      <div class="form-copy">${esc(this._t("subtitle"))}</div>
-      <form id="add-form">
-        <div class="field"><label for="add-title">${esc(this._t("taskTitle"))}</label><input id="add-title" name="title" required maxlength="120" autocomplete="off"></div>
-        <div class="field-row">
-          <div class="field"><label for="add-interval">${esc(this._t("interval"))}</label><input id="add-interval" name="interval_value" type="number" min="1" step="1" value="1" required></div>
-          <div class="field"><label for="add-type">${esc(this._t("every"))}</label><select id="add-type" name="interval_type"><option value="days">${esc(this._t("days"))}</option><option value="weeks">${esc(this._t("weeks"))}</option><option value="months">${esc(this._t("months"))}</option></select></div>
-        </div>
-        <details><summary>${esc(this._t("optional"))}</summary><div class="details-body">
-          <div class="field"><label>${esc(this._t("lastPerformed"))}</label><input name="last_performed" type="date" value="${localDateInput()}"></div>
-          <div class="field"><label>${esc(this._t("icon"))}</label><input name="icon" value="mdi:calendar-check" placeholder="mdi:hammer-wrench"></div>
-          <div class="field"><label>${esc(this._t("tag"))}</label>${this._tagSelect()}</div>
-          <div class="field"><span class="field-label">${esc(this._t("labels"))}</span>${this._labelOptions()}</div>
-        </div></details>
-        <button class="submit" type="submit">${esc(this._t("addTask"))}</button>
-      </form>
-    </aside>`;
-  }
-
-  _editMarkup() {
-    if (!this._editingId) return "";
-    const task = this._tasks.find((item) => item.id === this._editingId);
-    if (!task) return "";
-    const labels = this._taskLabels(task).map((label) => label.label_id);
-    return `<div class="modal-backdrop" data-action="close-edit-backdrop">
-      <section class="modal" role="dialog" aria-modal="true" aria-label="${esc(this._t("editTask"))}" data-modal>
-        <div class="modal-head"><div class="modal-title">${esc(this._t("editTask"))}</div><button class="modal-close" type="button" aria-label="${esc(this._t("cancel"))}" data-action="close-edit">×</button></div>
-        <form id="edit-form" data-id="${esc(task.id)}">
-          <div class="field"><label>${esc(this._t("taskTitle"))}</label><input name="title" required maxlength="120" value="${esc(task.title)}"></div>
-          <div class="field-row">
-            <div class="field"><label>${esc(this._t("interval"))}</label><input name="interval_value" type="number" min="1" step="1" required value="${esc(task.interval_value)}"></div>
-            <div class="field"><label>${esc(this._t("every"))}</label><select name="interval_type"><option value="days" ${task.interval_type === "days" ? "selected" : ""}>${esc(this._t("days"))}</option><option value="weeks" ${task.interval_type === "weeks" ? "selected" : ""}>${esc(this._t("weeks"))}</option><option value="months" ${task.interval_type === "months" ? "selected" : ""}>${esc(this._t("months"))}</option></select></div>
-          </div>
-          <div class="field"><label>${esc(this._t("lastPerformed"))}</label><input name="last_performed" type="date" value="${esc(String(task.last_performed || "").split("T")[0])}"></div>
-          <div class="field"><label>${esc(this._t("icon"))}</label><input name="icon" value="${esc(task.icon || "mdi:calendar-check")}"></div>
-          <div class="field"><label>${esc(this._t("tag"))}</label>${this._tagSelect(task.tag_id || "")}</div>
-          <div class="field"><span class="field-label">${esc(this._t("labels"))}</span>${this._labelOptions(labels)}</div>
-          <div class="modal-actions"><button class="secondary" type="button" data-action="close-edit">${esc(this._t("cancel"))}</button><button class="submit" type="submit">${esc(this._t("save"))}</button></div>
-        </form>
-      </section>
-    </div>`;
-  }
-
-  _render() {
-    if (!this.shadowRoot) return;
-    const title = this._config?.options?.sidebar_title || this._config?.data?.sidebar_title || "Home Maintenance";
-    if (this._loading) {
-      this.shadowRoot.innerHTML = `<style>${CSS}</style><header class="app-header"><ha-menu-button></ha-menu-button><div class="title-block"><div class="title">${esc(title)}</div></div></header><div class="loading">${esc(this._t("loading"))}</div><div class="toast" role="status"></div>`;
-      this._wireHassElements(); return;
-    }
-    if (this._loadError) {
-      this.shadowRoot.innerHTML = `<style>${CSS}</style><header class="app-header"><ha-menu-button></ha-menu-button><div class="title-block"><div class="title">${esc(title)}</div></div></header><div class="error-box"><h2>${esc(this._t("loadError"))}</h2><p>${esc(this._t("actionError"))}</p><button class="secondary" data-action="retry">${esc(this._t("retry"))}</button></div><div class="toast" role="status"></div>`;
-      this._wireHassElements(); return;
-    }
-    const stats = this._stats();
-    this.shadowRoot.innerHTML = `<style>${CSS}</style>
-      <header class="app-header"><ha-menu-button></ha-menu-button><div class="title-block"><div class="title">${esc(title)}</div></div><div class="header-version">v${VERSION}</div><button class="header-action" type="button" data-action="scroll-new">+ ${esc(this._t("newTask"))}</button></header>
-      <main class="page">
-        <section class="hero"><div><h1>${esc(title)}</h1><p>${esc(this._t("subtitle"))}</p></div></section>
-        <section class="stats">
-          <div class="stat"><span class="stat-label">${esc(this._t("total"))}</span><span class="stat-value">${stats.total}</span></div>
-          <div class="stat overdue"><span class="stat-label">${esc(this._t("overdue"))}</span><span class="stat-value">${stats.overdue}</span></div>
-          <div class="stat"><span class="stat-label">${esc(this._t("dueSoon"))}</span><span class="stat-value">${stats.soon}</span></div>
-          <div class="stat"><span class="stat-label">${esc(this._t("onTrack"))}</span><span class="stat-value">${stats.track}</span></div>
-        </section>
-        <section class="layout">
-          <section class="panel">
-            <div class="panel-head"><div class="search-wrap"><input class="search" id="task-search" value="${esc(this._search)}" placeholder="${esc(this._t("search"))}" aria-label="${esc(this._t("search"))}"></div>
-              <div class="filters"><button class="filter ${this._filter === "all" ? "active" : ""}" data-filter="all">${esc(this._t("all"))}</button><button class="filter ${this._filter === "overdue" ? "active" : ""}" data-filter="overdue">${esc(this._t("overdue"))}</button><button class="filter ${this._filter === "soon" ? "active" : ""}" data-filter="soon">${esc(this._t("dueSoon"))}</button><button class="filter ${this._filter === "later" ? "active" : ""}" data-filter="later">${esc(this._t("later"))}</button></div>
-            </div>
-            <div class="list-meta" id="result-count">${esc(this._t("results", { count: this._filteredTasks().length }))}</div>
-            <div id="task-list-host">${this._tasksMarkup()}</div>
-          </section>
-          ${this._addFormMarkup()}
-        </section>
-      </main>
-      ${this._editMarkup()}
-      <div class="toast" role="status" aria-live="polite"></div>`;
-    this._wireHassElements();
-  }
-
-  _wireHassElements() {
-    const menu = this.shadowRoot?.querySelector("ha-menu-button");
-    if (menu && this._hass) { menu.hass = this._hass; menu.narrow = this._narrow; }
-  }
-
-  _renderTasksOnly() {
-    const host = this.shadowRoot?.querySelector("#task-list-host");
-    const count = this.shadowRoot?.querySelector("#result-count");
-    if (host) host.innerHTML = this._tasksMarkup();
-    if (count) count.textContent = this._t("results", { count: this._filteredTasks().length });
-    this.shadowRoot?.querySelectorAll("[data-filter]").forEach((button) => button.classList.toggle("active", button.dataset.filter === this._filter));
-  }
-
-  _onInput(event) {
-    const target = event.target;
-    if (target?.id === "task-search") {
-      this._search = target.value || "";
-      this._renderTasksOnly();
-    }
-  }
-
-  async _onClick(event) {
-    const button = event.target?.closest?.("[data-action], [data-filter]");
-    if (!button) return;
-    if (button.dataset.filter) { this._filter = button.dataset.filter; this._renderTasksOnly(); return; }
-    const action = button.dataset.action;
-    if (action === "scroll-new") { this.shadowRoot.querySelector("#new-task-card")?.scrollIntoView({ behavior: "smooth", block: "start" }); this.shadowRoot.querySelector("#add-title")?.focus(); return; }
-    if (action === "retry") { this._loadData(); return; }
-    if (action === "close-edit") { this._editingId = null; this._render(); return; }
-    if (action === "close-edit-backdrop" && event.target === button) { this._editingId = null; this._render(); return; }
-    const id = button.dataset.id;
-    if (!id || this._busyId) return;
-    if (action === "edit") { this._editingId = id; this._render(); return; }
-    if (action === "complete") await this._completeTask(id);
-    if (action === "delete") await this._deleteTask(id);
-  }
-
-  async _onSubmit(event) {
-    const form = event.target;
-    if (!(form instanceof HTMLFormElement)) return;
-    event.preventDefault();
-    if (!form.reportValidity()) return;
-    if (form.id === "add-form") await this._addTask(form);
-    if (form.id === "edit-form") await this._saveEdit(form);
-  }
-
-  _payloadFromForm(form) {
-    const data = new FormData(form);
-    const title = String(data.get("title") || "").trim();
-    const intervalValue = Number(data.get("interval_value"));
-    const intervalType = String(data.get("interval_type") || "days");
-    if (!title || !Number.isInteger(intervalValue) || intervalValue < 1 || !["days", "weeks", "months"].includes(intervalType)) return null;
-    return {
-      title,
-      interval_value: intervalValue,
-      interval_type: intervalType,
-      last_performed: dateToIso(String(data.get("last_performed") || localDateInput())),
-      icon: String(data.get("icon") || "mdi:calendar-check").trim() || "mdi:calendar-check",
-      tag_id: String(data.get("tag_id") || "").trim() || null,
-      labels: data.getAll("labels").map((value) => String(value)),
-    };
-  }
-
-  async _addTask(form) {
-    const payload = this._payloadFromForm(form);
-    if (!payload) { this._showToast(this._t("required"), true); return; }
-    const submit = form.querySelector("button[type=submit]"); if (submit) submit.disabled = true;
-    try {
-      const addPayload = { ...payload }; if (!addPayload.tag_id) delete addPayload.tag_id;
-      await this._hass.callWS({ type: "home_maintenance/add_task", ...addPayload });
-      await this._loadData();
-      this._showToast(this._t("added"));
-    } catch (error) {
-      console.error("Home Maintenance: failed to add task", error); this._showToast(this._t("actionError"), true); if (submit) submit.disabled = false;
-    }
-  }
-
-  async _saveEdit(form) {
-    const payload = this._payloadFromForm(form);
-    const id = form.dataset.id;
-    if (!payload || !id) { this._showToast(this._t("required"), true); return; }
-    const submit = form.querySelector("button[type=submit]"); if (submit) submit.disabled = true;
-    try {
-      await this._hass.callWS({ type: "home_maintenance/update_task", task_id: id, updates: payload });
-      this._editingId = null;
-      await this._loadData();
-      this._showToast(this._t("updated"));
-    } catch (error) {
-      console.error("Home Maintenance: failed to update task", error); this._showToast(this._t("actionError"), true); if (submit) submit.disabled = false;
-    }
-  }
-
-  async _completeTask(id) {
-    this._busyId = id; this._renderTasksOnly();
-    try {
-      await this._hass.callWS({ type: "home_maintenance/complete_task", task_id: id });
-      await this._loadData();
-      this._showToast(this._t("completed"));
-    } catch (error) {
-      console.error("Home Maintenance: failed to complete task", error); this._busyId = null; this._renderTasksOnly(); this._showToast(this._t("actionError"), true);
-    } finally { this._busyId = null; }
-  }
-
-  async _deleteTask(id) {
-    const task = this._tasks.find((item) => item.id === id);
-    if (!task || !window.confirm(this._t("confirmDelete", { title: task.title }))) return;
-    this._busyId = id; this._renderTasksOnly();
-    try {
-      await this._hass.callWS({ type: "home_maintenance/remove_task", task_id: id });
-      await this._loadData();
-      this._showToast(this._t("removed"));
-    } catch (error) {
-      console.error("Home Maintenance: failed to delete task", error); this._busyId = null; this._renderTasksOnly(); this._showToast(this._t("actionError"), true);
-    } finally { this._busyId = null; }
-  }
-
-  _showToast(message, isError = false) {
-    const toast = this.shadowRoot?.querySelector(".toast");
-    if (!toast) return;
-    toast.textContent = message;
-    toast.classList.toggle("error", isError);
-    toast.classList.add("show");
-    if (this._toastTimer) window.clearTimeout(this._toastTimer);
-    this._toastTimer = window.setTimeout(() => toast.classList.remove("show"), 2600);
-  }
+  _stats(){ const statuses=this._tasks.map((t)=>this._status(t)); return {total:this._tasks.length,overdue:statuses.filter((s)=>s.kind==="overdue").length,soon:statuses.filter((s)=>["today","soon"].includes(s.kind)).length,completed:this._serverStats.completed||0,skipped:this._serverStats.skipped||0,snoozed:this._serverStats.snoozed||0}; }
+  _filtered(){ const q=this._search.trim().toLowerCase();return [...this._tasks].filter((t)=>{const labels=this._labelsFor(t).map((l)=>l.name).join(" ").toLowerCase();if(q&&!`${t.title} ${t.description||""} ${labels}`.toLowerCase().includes(q))return false;const k=this._status(t).kind;if(this._filter==="overdue"&&k!=="overdue")return false;if(this._filter==="soon"&&!['today','soon'].includes(k))return false;if(this._filter==="later"&&k!=="later")return false;return true;}).sort((a,b)=>(dueDate(a)?.getTime()??Infinity)-(dueDate(b)?.getTime()??Infinity)); }
+  _groups(tasks){ if(this._view==="labels"){const map=new Map();for(const t of tasks){const ls=this._labelsFor(t);if(!ls.length){const key=this._t("unlabelled");if(!map.has(key))map.set(key,[]);map.get(key).push(t);}for(const l of ls){if(!map.has(l.name))map.set(l.name,[]);map.get(l.name).push(t);}}return [...map.entries()].sort((a,b)=>a[0].localeCompare(b[0]));} const buckets=[["overdue",[]],["today",[]],["soon",[]],["later",[]],["unknown",[]]];for(const t of tasks){const k=this._status(t).kind;buckets.find(([x])=>x===k)?.[1].push(t);}return buckets.filter(([,v])=>v.length).map(([k,v])=>[k==="today"?this._t("dueToday"):k==="soon"?this._t("dueSoon"):k==="overdue"?this._t("overdue"):k==="later"?this._t("later"):this._t("unknown"),v]); }
+  _interval(t){return `${this._t("every")} ${t.interval_value} ${this._t(t.interval_type)}`;}
+  _task(t){const s=this._status(t),labels=this._labelsFor(t),busy=this._busy===t.id;return `<article class="task"><div class="ico"><ha-icon icon="${esc(t.icon||'mdi:calendar-check')}"></ha-icon></div><div class="main"><div class="row"><span class="task-title">${esc(t.title)}</span><span class="badge ${esc(s.kind)}">${esc(s.label)}</span>${t.snoozed_until?`<span class="badge">${esc(this._t("snoozed"))}</span>`:""}</div>${t.description||t.url?`<div class="desc">${esc(t.description||"")}${t.url?` ${t.description?"· ":""}<a href="${esc(t.url)}" target="_blank" rel="noopener">link</a>`:""}</div>`:""}<div class="task-meta"><span>${esc(this._interval(t))}</span><span>•</span><span>${esc(this._t("lastPerformed"))}: ${esc(t.last_performed?this._date(t.last_performed):this._t("never"))}</span><span>•</span><span>${(t.history||[]).length} ✓ / ${(t.skipped||[]).length} ↷</span></div>${labels.length?`<div class="labels">${labels.map((l)=>`<span class="label">${esc(l.name)}</span>`).join("")}</div>`:""}<div class="actions"><button class="action complete" data-act="complete" data-id="${esc(t.id)}" ${busy?"disabled":""}>✓ ${esc(this._t("complete"))}</button><button class="action" data-act="snooze" data-id="${esc(t.id)}" ${busy?"disabled":""}>${esc(this._t("snooze"))}</button><button class="action" data-act="skip" data-id="${esc(t.id)}" ${busy?"disabled":""}>${esc(this._t("skip"))}</button><button class="action" data-act="history" data-id="${esc(t.id)}">${esc(this._t("history"))}</button><button class="action" data-act="edit" data-id="${esc(t.id)}">${esc(this._t("edit"))}</button><button class="action delete" data-act="delete" data-id="${esc(t.id)}">${esc(this._t("delete"))}</button></div></div></article>`;}
+  _taskList(){const tasks=this._filtered();if(!this._tasks.length)return `<div class="empty"><h3>${esc(this._t("noTasks"))}</h3><p>${esc(this._t("noTasksHint"))}</p></div>`;if(!tasks.length)return `<div class="empty"><h3>${esc(this._t("noMatch"))}</h3></div>`;return this._groups(tasks).map(([name,items])=>`<section><div class="group-title">${esc(name)} <span class="count">${items.length}</span></div>${items.map((t)=>this._task(t)).join("")}</section>`).join("");}
+  _labelChecks(selected=[]){const set=new Set(selected);return `<div class="checks">${this._labels.map((l)=>`<label class="check"><input type="checkbox" name="labels" value="${esc(l.label_id)}" ${set.has(l.label_id)?"checked":""}>${esc(l.name)}</label>`).join("")||"—"}</div>`;}
+  _tagSelect(selected=""){return `<select name="tag_id"><option value="">${esc(this._t("noTag"))}</option>${this._tagOptions().map((x)=>`<option value="${esc(x.id)}" ${x.id===selected?"selected":""}>${esc(x.name)}</option>`).join("")}</select>`;}
+  _entityInput(value=""){return `<input name="source_entity_id" list="hm-entities" value="${esc(value)}" placeholder="sensor.example"><datalist id="hm-entities">${this._entityOptions().map((x)=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("")}</datalist>`;}
+  _fields(task=null){const labels=task?this._labelsFor(task).map((x)=>x.label_id):[];return `<div class="field"><label>${esc(this._t("title"))}</label><input name="title" maxlength="120" required value="${esc(task?.title||"")}"></div><div class="field-row"><div class="field"><label>${esc(this._t("interval"))}</label><input name="interval_value" type="number" min="1" required value="${esc(task?.interval_value||1)}"></div><div class="field"><label>${esc(this._t("every"))}</label><select name="interval_type">${["days","weeks","months","years"].map((x)=>`<option value="${x}" ${task?.interval_type===x?"selected":""}>${esc(this._t(x))}</option>`).join("")}</select></div></div><div class="field"><label>${esc(this._t("description"))}</label><textarea name="description">${esc(task?.description||"")}</textarea></div><div class="field"><label>${esc(this._t("url"))}</label><input name="url" type="url" value="${esc(task?.url||"")}"></div><details class="advanced" ${task?"open":""}><summary>${esc(this._t("options"))}</summary><div class="advanced-body"><div class="field"><label>${esc(this._t("lastPerformed"))}</label><input name="last_performed" type="date" value="${esc(task?.last_performed?String(task.last_performed).split("T")[0]:localInput())}"></div><div class="field"><label>${esc(this._t("icon"))}</label><input name="icon" value="${esc(task?.icon||"mdi:calendar-check")}"></div><div class="field"><label>${esc(this._t("tag"))}</label>${this._tagSelect(task?.tag_id||"")}</div><div class="field"><span class="field-label">${esc(this._t("labels"))}</span>${this._labelChecks(labels)}</div><div class="field-row"><label class="check"><input type="checkbox" name="notify_enabled" ${task?.notify_enabled?"checked":""}>${esc(this._t("notify"))}</label><div class="field"><label>${esc(this._t("notifyDays"))}</label><input name="notify_before_days" type="number" min="0" max="365" value="${esc(task?.notify_before_days??0)}"></div></div><div class="field"><label>${esc(this._t("smartEntity"))}</label>${this._entityInput(task?.source_entity_id||"")}</div><div class="field"><label>${esc(this._t("smartState"))}</label><input name="source_state" value="${esc(task?.source_state||"")}" placeholder="on"></div></div></details>`;}
+  _form(){return `<aside class="panel form-panel" id="new"><div class="form-head"><h2>${esc(this._t("newTask"))}</h2><p>${esc(this._t("subtitle"))}</p></div><form class="form" id="add-form"><div class="field-label">${esc(this._t("presets"))}</div><div class="preset-wrap">${this._presets.map((p,i)=>`<button type="button" class="preset" data-preset="${i}">${esc(p.title)}</button>`).join("")}</div>${this._fields()}<button class="btn primary" type="submit">${esc(this._t("addTask"))}</button></form></aside>`;}
+  _modal(){if(this._editing){return `<div class="modal-bg" data-close="1"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h2>${esc(this._t("editTask"))}</h2><button class="btn" data-act="close">×</button></div><form id="edit-form" data-id="${esc(this._editing.id)}"><div class="modal-body">${this._fields(this._editing)}</div><div class="modal-actions"><button type="button" class="btn" data-act="close">${esc(this._t("cancel"))}</button><button class="btn primary" type="submit">${esc(this._t("save"))}</button></div></form></div></div>`;}if(this._history){const done=[...(this._history.history||[])].reverse().map((x)=>`<div class="history-item"><span>✓ ${esc(this._t("complete"))}</span><span>${esc(this._date(x))}</span></div>`).join("");const skipped=[...(this._history.skipped||[])].reverse().map((x)=>`<div class="history-item skip"><span>↷ ${esc(this._t("skip"))}</span><span>${esc(this._date(x))}</span></div>`).join("");return `<div class="modal-bg" data-close="1"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h2>${esc(this._history.title)} · ${esc(this._t("history"))}</h2><button class="btn" data-act="close">×</button></div><div class="modal-body"><div class="history-list">${done||skipped?done+skipped:`<div class="empty">${esc(this._t("never"))}</div>`}</div></div></div></div>`;}if(this._deleting){return `<div class="modal-bg"><div class="modal" role="alertdialog" aria-modal="true"><div class="modal-head"><h2>${esc(this._t("deleteQuestion"))}</h2></div><div class="modal-body"><strong>${esc(this._deleting.title)}</strong><p>${esc(this._t("deleteCopy"))}</p></div><div class="modal-actions"><button class="btn" data-act="close">${esc(this._t("cancel"))}</button><button class="btn danger" data-act="confirm-delete" data-id="${esc(this._deleting.id)}">${esc(this._t("delete"))}</button></div></div></div>`;}return "";}
+  _renderLoading(){this.shadowRoot.innerHTML=`<style>${CSS}</style><div class="loading">Home Maintenance…</div>`;}
+  _render(){const title=this._config?.options?.sidebar_title||this._config?.data?.sidebar_title||"Home Maintenance",s=this._stats();this.shadowRoot.innerHTML=`<style>${CSS}</style><header class="top"><ha-menu-button></ha-menu-button><div class="top-title">${esc(title)}</div><span class="version">v${VERSION}</span></header><main class="page"><section class="hero"><div><h1>${esc(title)}</h1><p>${esc(this._t("subtitle"))}</p></div><div class="toolbar"><button class="btn" data-act="import">↥ ${esc(this._t("import"))}</button><button class="btn" data-act="export">↧ ${esc(this._t("export"))}</button><button class="btn primary" data-act="new">+ ${esc(this._t("newTask"))}</button><input class="sr" id="import-file" type="file" accept="application/json,.json"></div></section><section class="stats"><div class="stat"><span>${esc(this._t("total"))}</span><strong>${s.total}</strong></div><div class="stat bad"><span>${esc(this._t("overdue"))}</span><strong>${s.overdue}</strong></div><div class="stat"><span>${esc(this._t("dueSoon"))}</span><strong>${s.soon}</strong></div><div class="stat"><span>${esc(this._t("completed"))}</span><strong>${s.completed}</strong></div><div class="stat"><span>${esc(this._t("skipped"))}</span><strong>${s.skipped}</strong></div><div class="stat"><span>${esc(this._t("snoozed"))}</span><strong>${s.snoozed}</strong></div></section><section class="workspace"><section class="panel"><div class="panel-head"><input id="search" class="search" aria-label="${esc(this._t("search"))}" placeholder="${esc(this._t("search"))}" value="${esc(this._search)}"><div class="seg">${[["all",this._t("all")],["overdue",this._t("overdue")],["soon",this._t("dueSoon")],["later",this._t("later")]].map(([k,l])=>`<button class="chip ${this._filter===k?"active":""}" data-filter="${k}">${esc(l)}</button>`).join("")}</div><div class="seg"><button class="chip ${this._view==="timeline"?"active":""}" data-view="timeline">${esc(this._t("timeline"))}</button><button class="chip ${this._view==="labels"?"active":""}" data-view="labels">${esc(this._t("labelsView"))}</button></div></div><div class="meta">${esc(this._t("results",{count:this._filtered().length}))}</div>${this._taskList()}</section>${this._form()}</section></main>${this._modal()}<div class="toast" role="status" aria-live="polite"></div>`;this._wire();}
+  _wireMenu(){const m=this.shadowRoot?.querySelector("ha-menu-button");if(m&&this._hass)m.hass=this._hass;}
+  _wire(){this._wireMenu();this.shadowRoot.querySelector("#search")?.addEventListener("input",e=>{this._search=e.target.value;this._render();this.shadowRoot.querySelector("#search")?.focus();});this.shadowRoot.querySelectorAll("[data-filter]").forEach(b=>b.addEventListener("click",()=>{this._filter=b.dataset.filter;this._render();}));this.shadowRoot.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>{this._view=b.dataset.view;this._render();}));this.shadowRoot.querySelectorAll("[data-preset]").forEach(b=>b.addEventListener("click",()=>this._applyPreset(Number(b.dataset.preset))));this.shadowRoot.querySelectorAll("[data-act]").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();this._act(b.dataset.act,b.dataset.id);}));this.shadowRoot.querySelector("#add-form")?.addEventListener("submit",e=>this._submit(e,false));this.shadowRoot.querySelector("#edit-form")?.addEventListener("submit",e=>this._submit(e,true));const bg=this.shadowRoot.querySelector(".modal-bg[data-close]");bg?.addEventListener("click",e=>{if(e.target===bg)this._closeModal();});const file=this.shadowRoot.querySelector("#import-file");file?.addEventListener("change",e=>this._importFile(e.target.files?.[0]));}
+  _applyPreset(i){const p=this._presets[i],f=this.shadowRoot.querySelector("#add-form");if(!p||!f)return;for(const [k,v] of Object.entries(p)){const el=f.elements.namedItem(k);if(el)el.value=v;}f.elements.namedItem("title")?.focus();}
+  _payload(form){const fd=new FormData(form),labels=fd.getAll("labels").map(String);return {title:String(fd.get("title")||"").trim(),interval_value:Number(fd.get("interval_value")),interval_type:String(fd.get("interval_type")),last_performed:String(fd.get("last_performed")||""),icon:String(fd.get("icon")||"mdi:calendar-check"),tag_id:String(fd.get("tag_id")||""),labels,description:String(fd.get("description")||""),url:String(fd.get("url")||""),notify_enabled:fd.get("notify_enabled")!==null,notify_before_days:Number(fd.get("notify_before_days")||0),source_entity_id:String(fd.get("source_entity_id")||""),source_state:String(fd.get("source_state")||"")};}
+  async _submit(e,edit){e.preventDefault();const data=this._payload(e.currentTarget);if(!data.title||data.interval_value<1)return;try{if(edit){const id=e.currentTarget.dataset.id;await this._hass.callWS({type:"home_maintenance/update_task",task_id:id,updates:data});this._editing=null;this._toast(this._t("updated"));}else{await this._hass.callWS({type:"home_maintenance/add_task",...data});this._toast(this._t("added"));}await this._load();}catch(err){console.error(err);this._toast(this._t("error"));}}
+  async _act(act,id){if(act==="new"){this.shadowRoot.querySelector("#new")?.scrollIntoView({behavior:"smooth"});return;}if(act==="import"){this.shadowRoot.querySelector("#import-file")?.click();return;}if(act==="export"){return this._export();}if(act==="close"){this._closeModal();return;}const task=this._tasks.find(t=>t.id===id);if(act==="edit"&&task){this._editing=task;this._render();return;}if(act==="history"&&task){this._history=task;this._render();return;}if(act==="delete"&&task){this._deleting=task;this._render();return;}if(act==="confirm-delete"){return this._run(id,"remove_task",{},"removed");}if(act==="complete")return this._run(id,"complete_task",{},"completedToast");if(act==="snooze")return this._run(id,"snooze_task",{days:3},"snoozedToast");if(act==="skip")return this._run(id,"skip_task",{},"skippedToast");}
+  async _run(id,cmd,extra,msg){this._busy=id;this._render();try{await this._hass.callWS({type:`home_maintenance/${cmd}`,task_id:id,...extra});this._deleting=null;this._toast(this._t(msg));await this._load();}catch(e){console.error(e);this._busy=null;this._toast(this._t("error"));this._render();}}
+  _closeModal(){this._editing=null;this._history=null;this._deleting=null;this._render();}
+  async _export(){try{const data=await this._hass.callWS({type:"home_maintenance/export"});const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`home-maintenance-${localInput()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){console.error(e);this._toast(this._t("error"));}}
+  async _importFile(file){if(!file)return;try{const parsed=JSON.parse(await file.text());const tasks=Array.isArray(parsed)?parsed:parsed.tasks;if(!Array.isArray(tasks))throw new Error("Invalid export");await this._hass.callWS({type:"home_maintenance/import",tasks});this._toast(this._t("imported"));await this._load();}catch(e){console.error(e);this._toast(this._t("error"));}}
+  _toast(text){const el=this.shadowRoot?.querySelector(".toast");if(!el)return;el.textContent=text;el.classList.add("show");clearTimeout(this._toastTimer);this._toastTimer=setTimeout(()=>el.classList.remove("show"),2600);}
 }
 
-if (!customElements.get("home-maintenance-panel")) {
-  customElements.define("home-maintenance-panel", HomeMaintenancePanel);
-}
+if(!customElements.get("home-maintenance-panel")) customElements.define("home-maintenance-panel",HomeMaintenancePanel);
