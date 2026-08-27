@@ -15,6 +15,13 @@ ignore = [
     "ISC001", # incompatible with formatter
 ]
 
+[lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101", # pytest uses assert by design
+    "D103", # test names document the behavior
+    "PLR2004", # literal expected values are clearer in unit tests
+]
+
 [lint.flake8-pytest-style]
 fixture-parentheses = false
 
