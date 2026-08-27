@@ -94,9 +94,7 @@ class TaskStore:
             attr.asdict(task) for task in self._tasks.values() if task.tag_id == tag_id
         ]
 
-    def add(
-        self, task: HomeMaintenanceTask, labels: list[str] | None = None
-    ) -> str:
+    def add(self, task: HomeMaintenanceTask, labels: list[str] | None = None) -> str:
         """Add a new task and its entity."""
         add_entities = self.hass.data[const.DOMAIN].get("add_entities")
         if not add_entities:
@@ -196,7 +194,5 @@ class TaskStore:
     def _save(self) -> None:
         """Persist tasks without blocking the caller."""
         self.hass.async_create_task(
-            self._store.async_save(
-                [attr.asdict(task) for task in self._tasks.values()]
-            )
+            self._store.async_save([attr.asdict(task) for task in self._tasks.values()])
         )
