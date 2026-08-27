@@ -165,7 +165,7 @@ async def async_remove_entry(
 
 
 async def async_migrate_entry(
-    hass: HomeAssistant,
+    hass: HomeAssistant,  # noqa: ARG001
     entry: ConfigEntry,  # noqa: ARG001
 ) -> bool:
     """Handle migration of config entry data."""
