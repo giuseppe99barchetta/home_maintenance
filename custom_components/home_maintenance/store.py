@@ -194,13 +194,18 @@ class TaskStore:
         for key, value in updated.items():
             if key == "labels":
                 continue
-            normalized_value = value or None if key in {
-                "tag_id",
-                "description",
-                "url",
-                "source_entity_id",
-                "source_state",
-            } else value
+            normalized_value = (
+                value or None
+                if key
+                in {
+                    "tag_id",
+                    "description",
+                    "url",
+                    "source_entity_id",
+                    "source_state",
+                }
+                else value
+            )
             if hasattr(task, key):
                 setattr(task, key, normalized_value)
                 entity.task[key] = normalized_value
