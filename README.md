@@ -9,7 +9,11 @@ Maintained by **Giuseppe Barchetta** ([@giuseppe99barchetta](https://github.com/
 - 📅 Recurring schedules in **days, weeks, months or years**
 - ✅ Completion history for every task
 - ⏰ Due, overdue and next-7-days timeline
-- 💤 **Snooze** a task without pretending it was completed
+- 💤 **Snooze** a task by days or by hours without pretending it was completed
+- 🚦 **Priority** (high / normal / low) and **estimated duration** per task
+- 📌 **Fixed rhythm** schedules that keep their weekday or day-of-month even when you complete late
+- 🌦️ **Active months** for seasonal tasks (e.g. air-conditioner filters only in summer)
+- 🎯 A **Next maintenance task** sensor that always points at the single most important job
 - ↷ **Skip** only the current occurrence while preserving history
 - 🔔 Configurable Home Assistant persistent notifications before a task is due
 - 🏷️ Search, status filters and grouping by Home Assistant labels
@@ -69,7 +73,9 @@ When creating or editing a task you can configure:
 - icon and Home Assistant labels;
 - NFC tag;
 - notification lead time;
-- an optional entity and target state for automatic completion.
+- an optional entity and target state for automatic completion;
+- priority and estimated duration;
+- schedule mode (from completion, or fixed rhythm) and active months.
 
 Quick presets are available for common jobs such as HVAC filters, smoke-detector checks, water filters and boiler servicing.
 
@@ -85,6 +91,32 @@ A task can optionally reference a Home Assistant entity and a target state. When
 
 Example use cases include completing a maintenance task when a counter is reset, a helper is toggled, or another integration reports a known completion state.
 
+## 🚦 Priority, duration and the next-task sensor
+
+Each task has a **priority** (`high`, `normal`, `low`) and an optional **estimated duration** in minutes.
+
+`sensor.home_maintenance_next_task` shows the title of the most important task that is due right now. Tasks are ordered by a score: the priority weight (high 100, normal 50, low 0) plus 5 points per overdue day, capped at 10 days, so a neglected low-priority task eventually catches up. Ties go to the more overdue task, then to the shorter one.
+
+Its attributes include the top task (`entity_id`, `priority`, `score`, `overdue_days`, `duration_minutes`), `due_count` and the ordered `queue`. That makes "send one task at a time" automations simple:
+
+```yaml
+triggers:
+  - trigger: time
+    at: "09:00:00"
+actions:
+  - action: notify.mobile_app_phone
+    data:
+      title: Maintenance
+      message: "{{ states('sensor.home_maintenance_next_task') }}"
+```
+
+## 📌 Schedule modes and seasons
+
+- **From completion** (`interval`, default): the next due date counts from the day you complete the task.
+- **Fixed rhythm** (`fixed`): the task keeps its original rhythm. A weekly task due on Monday and completed on Wednesday is due again next Monday, not next Wednesday. Missed slots are skipped instead of piling up.
+
+**Active months** limit a task to part of the year. Outside those months the task is not due, and its due date moves to the first day of the next active month.
+
 ## 📲 NFC tags
 
 Associate a Home Assistant `tag.*` entity with a task. Scanning the underlying tag completes the task and records the completion source as NFC.
@@ -98,7 +130,8 @@ The integration exposes the following services:
 | `home_maintenance.create_task` | Create a recurring task |
 | `home_maintenance.complete_task` | Complete a task now |
 | `home_maintenance.reset_last_performed` | Complete a task using an optional historical date |
-| `home_maintenance.snooze_task` | Postpone a task without changing completion history |
+| `home_maintenance.snooze_task` | Postpone a task by `days` and/or `hours` without changing completion history |
+| `home_maintenance.set_task_options` | Change priority, duration, schedule mode or active months |
 | `home_maintenance.skip_task` | Skip only the current occurrence |
 | `home_maintenance.delete_task` | Permanently delete a task |
 
@@ -109,6 +142,16 @@ service: home_maintenance.snooze_task
 data:
   entity_id: binary_sensor.clean_gutters
   days: 7
+```
+
+```yaml
+service: home_maintenance.set_task_options
+data:
+  entity_id: binary_sensor.clean_gutters
+  priority: high
+  duration_minutes: 30
+  schedule_mode: fixed
+  active_months: [3, 4, 10, 11]
 ```
 
 ## 📣 Events
@@ -139,6 +182,10 @@ Each task is represented by a binary sensor and exposes useful attributes includ
 - description / URL
 - smart-completion entity and target state
 - NFC tag when configured
+- `priority` / `priority_score`
+- `duration_minutes`
+- `schedule_mode`
+- `active_months` / `in_season`
 
 The sensor turns on when the task is due or overdue.
 
