@@ -12,7 +12,16 @@ from homeassistant.util import dt as dt_util
 
 from . import const
 from .binary_sensor import HomeMaintenanceSensor
-from .schedule import calculate_next_due, effective_due_date
+from .schedule import (
+    DEFAULT_PRIORITY,
+    DEFAULT_SCHEDULE_MODE,
+    PRIORITIES,
+    SCHEDULE_MODES,
+    calculate_next_due,
+    effective_due_date,
+    next_fixed_occurrence,
+    normalize_months,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -46,6 +55,10 @@ class HomeMaintenanceTask:
     last_notified: str | None = attr.ib(default=None)
     source_entity_id: str | None = attr.ib(default=None)
     source_state: str | None = attr.ib(default=None)
+    priority: str = attr.ib(default=DEFAULT_PRIORITY)
+    duration_minutes: int | None = attr.ib(default=None)
+    schedule_mode: str = attr.ib(default=DEFAULT_SCHEDULE_MODE)
+    active_months: list[int] = attr.ib(factory=list)
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> HomeMaintenanceTask:
@@ -65,7 +78,28 @@ class HomeMaintenanceTask:
         clean.setdefault("last_notified", None)
         clean.setdefault("source_entity_id", None)
         clean.setdefault("source_state", None)
+        clean["priority"] = (
+            clean.get("priority")
+            if clean.get("priority") in PRIORITIES
+            else DEFAULT_PRIORITY
+        )
+        clean["schedule_mode"] = (
+            clean.get("schedule_mode")
+            if clean.get("schedule_mode") in SCHEDULE_MODES
+            else DEFAULT_SCHEDULE_MODE
+        )
+        clean["duration_minutes"] = _clean_duration(clean.get("duration_minutes"))
+        clean["active_months"] = normalize_months(clean.get("active_months"))
         return cls(**clean)
+
+
+def _clean_duration(value: Any) -> int | None:
+    """Return a positive duration in minutes, or None."""
+    try:
+        minutes = int(value)
+    except (TypeError, ValueError):
+        return None
+    return minutes if minutes > 0 else None
 
 
 class TaskStore:
@@ -206,6 +240,14 @@ class TaskStore:
                 }
                 else value
             )
+            if key == "active_months":
+                normalized_value = normalize_months(value)
+            elif key == "duration_minutes":
+                normalized_value = _clean_duration(value)
+            elif (key == "priority" and value not in PRIORITIES) or (
+                key == "schedule_mode" and value not in SCHEDULE_MODES
+            ):
+                continue
             if hasattr(task, key):
                 setattr(task, key, normalized_value)
                 entity.task[key] = normalized_value
@@ -237,9 +279,20 @@ class TaskStore:
         performed_date_str = performed_date.replace(
             hour=0, minute=0, second=0, microsecond=0
         ).isoformat()
+        next_override = None
+        if task.schedule_mode == "fixed":
+            anchor = {**attr.asdict(task), "snoozed_until": None}
+            current_due = effective_due_date(anchor, performed_date)
+            if current_due is not None:
+                next_override = next_fixed_occurrence(
+                    current_due,
+                    performed_date,
+                    task.interval_value,
+                    task.interval_type,
+                ).isoformat()
         task.last_performed = performed_date_str
         task.snoozed_until = None
-        task.next_due_override = None
+        task.next_due_override = next_override
         task.history.append(performed_date_str)
         entity.task.update(attr.asdict(task))
         self.hass.async_create_task(entity.async_update_ha_state(force_refresh=True))
@@ -255,15 +308,22 @@ class TaskStore:
         """Backward-compatible alias for completing a task."""
         self.complete_task(task_id, performed_date)
 
-    def snooze_task(self, task_id: str, days: int) -> None:
-        """Temporarily postpone a task without changing its completion history."""
-        if days < 1:
-            msg = "Snooze days must be greater than zero."
+    def snooze_task(self, task_id: str, days: int = 0, hours: int = 0) -> None:
+        """
+        Temporarily postpone a task without changing its completion history.
+
+        Day snoozes end at local midnight of the target day; hour snoozes keep
+        the exact time so a task can come back later the same day.
+        """
+        if days < 0 or hours < 0 or days + hours < 1:
+            msg = "Snooze must be at least one day or one hour."
             raise RuntimeError(msg)
         entity, task = self._entity_and_task(task_id)
-        snoozed = (dt_util.now() + timedelta(days=days)).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        snoozed = dt_util.now() + timedelta(days=days, hours=hours)
+        if not hours:
+            snoozed = snoozed.replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            snoozed = snoozed.replace(second=0, microsecond=0)
         task.snoozed_until = snoozed.isoformat()
         entity.task["snoozed_until"] = task.snoozed_until
         self.hass.async_create_task(entity.async_update_ha_state(force_refresh=True))

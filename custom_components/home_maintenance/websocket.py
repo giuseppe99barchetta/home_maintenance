@@ -4,13 +4,14 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
+import attr
 import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.components.websocket_api import connection, messages
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import DOMAIN, TASK_OPTION_FIELDS
 from .schedule import INTERVAL_TYPES
 from .store import HomeMaintenanceTask, TaskStore
 
@@ -62,6 +63,7 @@ TASK_UPDATES_SCHEMA = vol.Schema(
         vol.Optional("notify_before_days"): vol.All(int, vol.Range(min=0, max=365)),
         vol.Optional("source_entity_id"): vol.Any(str, None),
         vol.Optional("source_state"): vol.Any(str, None),
+        **TASK_OPTION_FIELDS,
     },
     extra=vol.PREVENT_EXTRA,
 )
@@ -174,7 +176,12 @@ def websocket_add_task(
         notify_before_days=msg.get("notify_before_days", 0),
         source_entity_id=msg.get("source_entity_id") or None,
         source_state=msg.get("source_state") or None,
+        priority=msg.get("priority", "normal"),
+        duration_minutes=msg.get("duration_minutes"),
+        schedule_mode=msg.get("schedule_mode", "interval"),
+        active_months=msg.get("active_months", []),
     )
+    task = HomeMaintenanceTask.from_dict(attr.asdict(task))
     try:
         new_id = store.add(task, msg.get("labels", []))
     except RuntimeError as err:
@@ -248,7 +255,9 @@ def websocket_snooze_task(
     if store is None:
         return
     try:
-        store.snooze_task(msg["task_id"], msg["days"])
+        store.snooze_task(
+            msg["task_id"], days=msg.get("days", 0), hours=msg.get("hours", 0)
+        )
     except RuntimeError as err:
         conn.send_error(msg["id"], "snooze_failed", str(err))
         return
@@ -417,7 +426,8 @@ async def async_register_websockets(hass: HomeAssistant) -> None:
         websocket_snooze_task,
         {
             vol.Required("task_id"): str,
-            vol.Required("days"): vol.All(int, vol.Range(min=1, max=3650)),
+            vol.Optional("days", default=0): vol.All(int, vol.Range(min=0, max=3650)),
+            vol.Optional("hours", default=0): vol.All(int, vol.Range(min=0, max=720)),
         },
     )
     _register_command(hass, "statistics", websocket_statistics)
@@ -439,6 +449,7 @@ async def async_register_websockets(hass: HomeAssistant) -> None:
         vol.Optional("notify_before_days"): vol.All(int, vol.Range(min=0, max=365)),
         vol.Optional("source_entity_id"): str,
         vol.Optional("source_state"): str,
+        **TASK_OPTION_FIELDS,
     }
     _register_command(hass, "add_task", websocket_add_task, add_schema)
     _register_command(

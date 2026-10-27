@@ -58,6 +58,53 @@ create_task:
       required: false
       selector:
         icon:
+    priority:
+      name: Priority
+      required: false
+      selector:
+        select:
+          options:
+            - low
+            - normal
+            - high
+    duration_minutes:
+      name: Estimated duration (minutes)
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 1440
+          mode: box
+          unit_of_measurement: min
+    schedule_mode:
+      name: Schedule mode
+      description: "interval: next due counts from completion. fixed: keeps the original rhythm (e.g. always Mondays)."
+      required: false
+      selector:
+        select:
+          options:
+            - interval
+            - fixed
+    active_months:
+      name: Active months
+      description: Months (1-12) when the task applies. Empty means all year.
+      required: false
+      selector:
+        select:
+          multiple: true
+          options:
+            - { label: January, value: "1" }
+            - { label: February, value: "2" }
+            - { label: March, value: "3" }
+            - { label: April, value: "4" }
+            - { label: May, value: "5" }
+            - { label: June, value: "6" }
+            - { label: July, value: "7" }
+            - { label: August, value: "8" }
+            - { label: September, value: "9" }
+            - { label: October, value: "10" }
+            - { label: November, value: "11" }
+            - { label: December, value: "12" }
 
 complete_task:
   name: Complete task
@@ -84,11 +131,20 @@ snooze_task:
           integration: home_maintenance
     days:
       name: Days
-      required: true
+      required: false
       selector:
         number:
-          min: 1
+          min: 0
           max: 3650
+          mode: box
+    hours:
+      name: Hours
+      description: Snooze for a number of hours instead of (or on top of) days.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 720
           mode: box
 
 skip_task:
@@ -114,3 +170,62 @@ delete_task:
         entity:
           domain: binary_sensor
           integration: home_maintenance
+
+set_task_options:
+  name: Set task options
+  description: Change priority, estimated duration, schedule mode or active months of a task.
+  fields:
+    entity_id:
+      name: Entity ID
+      required: true
+      selector:
+        entity:
+          domain: binary_sensor
+          integration: home_maintenance
+    priority:
+      name: Priority
+      required: false
+      selector:
+        select:
+          options:
+            - low
+            - normal
+            - high
+    duration_minutes:
+      name: Estimated duration (minutes)
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 1440
+          mode: box
+          unit_of_measurement: min
+    schedule_mode:
+      name: Schedule mode
+      description: "interval: next due counts from completion. fixed: keeps the original rhythm (e.g. always Mondays)."
+      required: false
+      selector:
+        select:
+          options:
+            - interval
+            - fixed
+    active_months:
+      name: Active months
+      description: Months (1-12) when the task applies. Empty means all year.
+      required: false
+      selector:
+        select:
+          multiple: true
+          options:
+            - { label: January, value: "1" }
+            - { label: February, value: "2" }
+            - { label: March, value: "3" }
+            - { label: April, value: "4" }
+            - { label: May, value: "5" }
+            - { label: June, value: "6" }
+            - { label: July, value: "7" }
+            - { label: August, value: "8" }
+            - { label: September, value: "9" }
+            - { label: October, value: "10" }
+            - { label: November, value: "11" }
+            - { label: December, value: "12" }
