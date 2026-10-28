@@ -9,8 +9,10 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.components.websocket_api import connection, messages
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 
+from . import ai
 from .const import DOMAIN, TASK_OPTION_FIELDS
 from .schedule import INTERVAL_TYPES
 from .store import HomeMaintenanceTask, TaskStore
@@ -302,6 +304,68 @@ def websocket_check_step(
     _send_success(conn, msg, {"success": True, "task_completed": completed})
 
 
+def _entry_options(hass: HomeAssistant) -> dict[str, Any]:
+    entries = hass.config_entries.async_entries(DOMAIN)
+    return dict(entries[0].options) if entries else {}
+
+
+@callback
+def websocket_ai_status(
+    hass: HomeAssistant,
+    conn: connection.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Tell the panel whether AI suggestions are available."""
+    entities = ai.available_entities(hass)
+    conn.send_result(
+        msg["id"],
+        {
+            "available": bool(entities),
+            "entities": entities,
+            "entity_id": ai.configured_entity(hass, _entry_options(hass)),
+        },
+    )
+
+
+@websocket_api.async_response
+async def websocket_ai_suggest_task(
+    hass: HomeAssistant,
+    conn: connection.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Return a task proposal generated from a free-text description."""
+    try:
+        proposal = await ai.async_suggest_task(
+            hass,
+            msg["description"],
+            ai.configured_entity(hass, _entry_options(hass)),
+        )
+    except HomeAssistantError as err:
+        conn.send_error(msg["id"], "ai_failed", str(err))
+        return
+    conn.send_result(msg["id"], proposal)
+
+
+@websocket_api.async_response
+async def websocket_ai_suggest_steps(
+    hass: HomeAssistant,
+    conn: connection.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Return checklist steps proposed for a task."""
+    try:
+        steps = await ai.async_suggest_steps(
+            hass,
+            msg["title"],
+            msg.get("description"),
+            ai.configured_entity(hass, _entry_options(hass)),
+        )
+    except HomeAssistantError as err:
+        conn.send_error(msg["id"], "ai_failed", str(err))
+        return
+    conn.send_result(msg["id"], {"checklist": steps})
+
+
 @callback
 def websocket_remove_task(
     hass: HomeAssistant,
@@ -458,6 +522,22 @@ async def async_register_websockets(hass: HomeAssistant) -> None:
             vol.Required("task_id"): str,
             vol.Required("index"): vol.All(int, vol.Range(min=0)),
             vol.Optional("checked"): bool,
+        },
+    )
+    _register_command(hass, "ai_status", websocket_ai_status)
+    _register_command(
+        hass,
+        "ai_suggest_task",
+        websocket_ai_suggest_task,
+        {vol.Required("description"): vol.All(str, vol.Length(min=1, max=2000))},
+    )
+    _register_command(
+        hass,
+        "ai_suggest_steps",
+        websocket_ai_suggest_steps,
+        {
+            vol.Required("title"): vol.All(str, vol.Length(min=1, max=200)),
+            vol.Optional("description"): vol.Any(str, None),
         },
     )
     _register_command(hass, "statistics", websocket_statistics)

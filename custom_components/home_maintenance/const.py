@@ -3,10 +3,11 @@
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import selector
 
 from .schedule import PRIORITIES, SCHEDULE_MODES
 
-VERSION = "2.2.0"
+VERSION = "2.3.0"
 NAME = "Home Maintenance"
 MANUFACTURER = "Giuseppe Barchetta"
 
@@ -130,5 +131,11 @@ def get_options_schema(config_entry: ConfigEntry) -> vol.Schema:
                     config_entry.data.get("sidebar_title", PANEL_TITLE),
                 ),
             ): cv.string,
+            vol.Optional(
+                "ai_task_entity",
+                description={
+                    "suggested_value": config_entry.options.get("ai_task_entity")
+                },
+            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="ai_task")),
         }
     )

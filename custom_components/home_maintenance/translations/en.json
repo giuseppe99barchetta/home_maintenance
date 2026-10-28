@@ -20,7 +20,11 @@
       "init": {
         "data": {
           "admin_only": "Restrict panel to admins only",
-          "sidebar_title": "The name shown in the sidebar for this integration."
+          "sidebar_title": "The name shown in the sidebar for this integration.",
+          "ai_task_entity": "AI Task used for suggestions (empty = Home Assistant default)"
+        },
+        "data_description": {
+          "ai_task_entity": "Used by 'Fill in with AI' and 'Suggest steps' in the panel."
         }
       }
     }
