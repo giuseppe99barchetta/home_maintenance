@@ -12,7 +12,16 @@ from homeassistant.util import dt as dt_util
 
 from . import const
 from .binary_sensor import HomeMaintenanceSensor
-from .schedule import calculate_next_due, effective_due_date
+from .schedule import (
+    DEFAULT_PRIORITY,
+    DEFAULT_SCHEDULE_MODE,
+    PRIORITIES,
+    SCHEDULE_MODES,
+    calculate_next_due,
+    effective_due_date,
+    next_fixed_occurrence,
+    normalize_months,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -22,6 +31,15 @@ _LOGGER = logging.getLogger(__name__)
 STORAGE_KEY = f"{const.DOMAIN}.storage"
 STORAGE_VERSION_MAJOR = 1
 STORAGE_VERSION_MINOR = 2
+
+# Changing any of these starts a new fixed-rhythm series.
+_ANCHOR_RESET_KEYS = {
+    "schedule_mode",
+    "interval_value",
+    "interval_type",
+    "last_performed",
+    "next_due_override",
+}
 
 
 @attr.s(slots=True)
@@ -46,6 +64,11 @@ class HomeMaintenanceTask:
     last_notified: str | None = attr.ib(default=None)
     source_entity_id: str | None = attr.ib(default=None)
     source_state: str | None = attr.ib(default=None)
+    priority: str = attr.ib(default=DEFAULT_PRIORITY)
+    duration_minutes: int | None = attr.ib(default=None)
+    schedule_mode: str = attr.ib(default=DEFAULT_SCHEDULE_MODE)
+    active_months: list[int] = attr.ib(factory=list)
+    schedule_anchor: str | None = attr.ib(default=None)
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> HomeMaintenanceTask:
@@ -65,7 +88,28 @@ class HomeMaintenanceTask:
         clean.setdefault("last_notified", None)
         clean.setdefault("source_entity_id", None)
         clean.setdefault("source_state", None)
+        clean["priority"] = (
+            clean.get("priority")
+            if clean.get("priority") in PRIORITIES
+            else DEFAULT_PRIORITY
+        )
+        clean["schedule_mode"] = (
+            clean.get("schedule_mode")
+            if clean.get("schedule_mode") in SCHEDULE_MODES
+            else DEFAULT_SCHEDULE_MODE
+        )
+        clean["duration_minutes"] = _clean_duration(clean.get("duration_minutes"))
+        clean["active_months"] = normalize_months(clean.get("active_months"))
         return cls(**clean)
+
+
+def _clean_duration(value: Any) -> int | None:
+    """Return a positive duration in minutes, or None."""
+    try:
+        minutes = int(value)
+    except (TypeError, ValueError):
+        return None
+    return minutes if minutes > 0 else None
 
 
 class TaskStore:
@@ -191,6 +235,7 @@ class TaskStore:
             msg = "Task not found."
             raise RuntimeError(msg)
 
+        rhythm_before = {key: getattr(task, key) for key in _ANCHOR_RESET_KEYS}
         for key, value in updated.items():
             if key == "labels":
                 continue
@@ -206,9 +251,22 @@ class TaskStore:
                 }
                 else value
             )
+            if key == "active_months":
+                normalized_value = normalize_months(value)
+            elif key == "duration_minutes":
+                normalized_value = _clean_duration(value)
+            elif (key == "priority" and value not in PRIORITIES) or (
+                key == "schedule_mode" and value not in SCHEDULE_MODES
+            ):
+                continue
             if hasattr(task, key):
                 setattr(task, key, normalized_value)
                 entity.task[key] = normalized_value
+
+        rhythm_after = {key: getattr(task, key) for key in _ANCHOR_RESET_KEYS}
+        if rhythm_after != rhythm_before and "schedule_anchor" not in updated:
+            task.schedule_anchor = None
+            entity.task["schedule_anchor"] = None
 
         if "title" in updated:
             entity._attr_name = str(updated["title"])  # noqa: SLF001
@@ -237,9 +295,12 @@ class TaskStore:
         performed_date_str = performed_date.replace(
             hour=0, minute=0, second=0, microsecond=0
         ).isoformat()
+        next_override = None
+        if task.schedule_mode == "fixed":
+            next_override = self._next_fixed_due(task, performed_date)
         task.last_performed = performed_date_str
         task.snoozed_until = None
-        task.next_due_override = None
+        task.next_due_override = next_override
         task.history.append(performed_date_str)
         entity.task.update(attr.asdict(task))
         self.hass.async_create_task(entity.async_update_ha_state(force_refresh=True))
@@ -255,15 +316,22 @@ class TaskStore:
         """Backward-compatible alias for completing a task."""
         self.complete_task(task_id, performed_date)
 
-    def snooze_task(self, task_id: str, days: int) -> None:
-        """Temporarily postpone a task without changing its completion history."""
-        if days < 1:
-            msg = "Snooze days must be greater than zero."
+    def snooze_task(self, task_id: str, days: int = 0, hours: int = 0) -> None:
+        """
+        Temporarily postpone a task without changing its completion history.
+
+        Day snoozes end at local midnight of the target day; hour snoozes keep
+        the exact time so a task can come back later the same day.
+        """
+        if days < 0 or hours < 0 or days + hours < 1:
+            msg = "Snooze must be at least one day or one hour."
             raise RuntimeError(msg)
         entity, task = self._entity_and_task(task_id)
-        snoozed = (dt_util.now() + timedelta(days=days)).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        snoozed = dt_util.now() + timedelta(days=days, hours=hours)
+        if not hours:
+            snoozed = snoozed.replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            snoozed = snoozed.replace(second=0, microsecond=0)
         task.snoozed_until = snoozed.isoformat()
         entity.task["snoozed_until"] = task.snoozed_until
         self.hass.async_create_task(entity.async_update_ha_state(force_refresh=True))
@@ -278,9 +346,12 @@ class TaskStore:
             msg = "Could not calculate the current due date."
             raise RuntimeError(msg)
         task.skipped.append(due.isoformat())
-        task.next_due_override = calculate_next_due(
-            due, task.interval_value, task.interval_type
-        ).isoformat()
+        if task.schedule_mode == "fixed":
+            task.next_due_override = self._next_fixed_due(task, due)
+        else:
+            task.next_due_override = calculate_next_due(
+                due, task.interval_value, task.interval_type
+            ).isoformat()
         task.snoozed_until = None
         entity.task.update(attr.asdict(task))
         self.hass.async_create_task(entity.async_update_ha_state(force_refresh=True))
@@ -317,6 +388,37 @@ class TaskStore:
                 self.add(task)
             imported += 1
         return imported
+
+    def _next_fixed_due(
+        self, task: HomeMaintenanceTask, completed: datetime
+    ) -> str | None:
+        """
+        Return the next fixed-rhythm due date and remember the series anchor.
+
+        The anchor is the first due date seen in fixed mode and is kept
+        unclamped, so later occurrences are always anchor + k * interval.
+        """
+        current_due = effective_due_date(
+            {**attr.asdict(task), "snoozed_until": None}, completed
+        )
+        if current_due is None:
+            return None
+        anchor = None
+        if task.schedule_anchor:
+            try:
+                anchor = datetime.fromisoformat(task.schedule_anchor)
+            except ValueError:
+                anchor = None
+        if anchor is None:
+            anchor = current_due
+            task.schedule_anchor = anchor.isoformat()
+        return next_fixed_occurrence(
+            anchor,
+            completed,
+            task.interval_value,
+            task.interval_type,
+            current_due=current_due,
+        ).isoformat()
 
     def _entity_and_task(
         self, task_id: str

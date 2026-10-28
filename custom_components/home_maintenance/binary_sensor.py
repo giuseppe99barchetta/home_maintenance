@@ -11,7 +11,14 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import const
-from .schedule import day_delta, effective_due_date
+from .schedule import (
+    day_delta,
+    effective_due_date,
+    in_season,
+    is_due,
+    priority_of,
+    priority_score,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,7 +82,7 @@ class HomeMaintenanceSensor(BinarySensorEntity):
         now = dt_util.now()
         due = effective_due_date(self.task, now)
         delta = day_delta(due, now) if due else None
-        self._attr_is_on = due is None or delta <= 0
+        self._attr_is_on = is_due(self.task, now)
 
         attrs = {
             "last_performed": self.task.get("last_performed"),
@@ -93,6 +100,12 @@ class HomeMaintenanceSensor(BinarySensorEntity):
             "url": self.task.get("url"),
             "source_entity_id": self.task.get("source_entity_id"),
             "source_state": self.task.get("source_state"),
+            "priority": priority_of(self.task),
+            "priority_score": priority_score(self.task, now),
+            "duration_minutes": self.task.get("duration_minutes"),
+            "schedule_mode": self.task.get("schedule_mode", "interval"),
+            "active_months": self.task.get("active_months") or [],
+            "in_season": in_season(self.task, now),
         }
         if self.task.get("tag_id"):
             attrs["tag_id"] = self.task["tag_id"]

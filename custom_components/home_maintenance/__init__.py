@@ -2,11 +2,14 @@
 
 import logging
 import uuid
+from collections.abc import Callable, Coroutine
 from datetime import datetime
-from typing import cast
+from typing import Any, cast
 
+import attr
 from homeassistant.components import persistent_notification
-from homeassistant.components.binary_sensor import DOMAIN as PLATFORM
+from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
+from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.components.tag.const import EVENT_TAG_SCANNED
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_STATE_CHANGED
@@ -27,6 +30,7 @@ from .websocket import async_register_websockets
 
 _LOGGER = logging.getLogger(__name__)
 CONFIG_SCHEMA = const.CONFIG_SCHEMA
+PLATFORMS = [BINARY_SENSOR_DOMAIN, SENSOR_DOMAIN]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:  # noqa: ARG001
@@ -118,7 +122,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "entities": {},
     }
 
-    await hass.config_entries.async_forward_entry_setups(entry, [PLATFORM])
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await async_register_panel(hass, entry)
 
     hass.data[const.DOMAIN]["unsub_tag_scanned"] = hass.bus.async_listen(
@@ -136,7 +140,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload the Home Maintenance config entry."""
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, [PLATFORM])
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if not unload_ok:
         return False
     domain_data = hass.data.get(const.DOMAIN, {})
@@ -187,6 +191,30 @@ def _task_id_from_entity(hass: HomeAssistant, entity_id: str) -> str:
     return cast("RegistryEntry", registry_entry).unique_id
 
 
+def _set_options_handler(
+    hass: HomeAssistant,
+) -> Callable[[ServiceCall], Coroutine[Any, Any, None]]:
+    """Return the set_task_options service handler."""
+
+    async def async_srv_set_options(call: ServiceCall) -> None:
+        """Update priority, duration, schedule mode or season of a task."""
+        store = _store(hass)
+        if store is None:
+            msg = "Home Maintenance is not loaded"
+            raise HomeAssistantError(msg)
+        task_id = _task_id_from_entity(hass, call.data["entity_id"])
+        updates = {key: val for key, val in call.data.items() if key != "entity_id"}
+        if not updates:
+            msg = "No options to update"
+            raise HomeAssistantError(msg)
+        try:
+            store.update_task(task_id, updates)
+        except RuntimeError as err:
+            raise HomeAssistantError(str(err)) from err
+
+    return async_srv_set_options
+
+
 @callback
 def register_services(hass: HomeAssistant) -> None:
     """Register services exposed by Home Maintenance."""
@@ -225,8 +253,12 @@ def register_services(hass: HomeAssistant) -> None:
             description=call.data.get("description") or None,
             url=call.data.get("url") or None,
             icon=call.data.get("icon") or "mdi:calendar-check",
+            priority=call.data.get("priority", "normal"),
+            duration_minutes=call.data.get("duration_minutes"),
+            schedule_mode=call.data.get("schedule_mode", "interval"),
+            active_months=call.data.get("active_months", []),
         )
-        require_store().add(task)
+        require_store().add(HomeMaintenanceTask.from_dict(attr.asdict(task)))
 
     async def async_srv_complete(call: ServiceCall) -> None:
         """Complete a task now."""
@@ -236,7 +268,9 @@ def register_services(hass: HomeAssistant) -> None:
     async def async_srv_snooze(call: ServiceCall) -> None:
         """Snooze a task for the requested number of days."""
         require_store().snooze_task(
-            _task_id_from_entity(hass, call.data["entity_id"]), call.data["days"]
+            _task_id_from_entity(hass, call.data["entity_id"]),
+            days=call.data["days"],
+            hours=call.data["hours"],
         )
 
     async def async_srv_skip(call: ServiceCall) -> None:
@@ -256,6 +290,11 @@ def register_services(hass: HomeAssistant) -> None:
         (const.SERVICE_SNOOZE, async_srv_snooze, const.SERVICE_SNOOZE_SCHEMA),
         (const.SERVICE_SKIP, async_srv_skip, const.SERVICE_ENTITY_SCHEMA),
         (const.SERVICE_DELETE, async_srv_delete, const.SERVICE_ENTITY_SCHEMA),
+        (
+            const.SERVICE_SET_OPTIONS,
+            _set_options_handler(hass),
+            const.SERVICE_SET_OPTIONS_SCHEMA,
+        ),
     )
     for name, handler, schema in services:
         hass.services.async_register(const.DOMAIN, name, handler, schema=schema)

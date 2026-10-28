@@ -4,7 +4,9 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import config_validation as cv
 
-VERSION = "2.0.0"
+from .schedule import PRIORITIES, SCHEDULE_MODES
+
+VERSION = "2.1.0"
 NAME = "Home Maintenance"
 MANUFACTURER = "Giuseppe Barchetta"
 
@@ -30,6 +32,16 @@ SERVICE_COMPLETE = "complete_task"
 SERVICE_SNOOZE = "snooze_task"
 SERVICE_SKIP = "skip_task"
 SERVICE_DELETE = "delete_task"
+SERVICE_SET_OPTIONS = "set_task_options"
+
+TASK_OPTION_FIELDS = {
+    vol.Optional("priority"): vol.In(PRIORITIES),
+    vol.Optional("duration_minutes"): vol.Any(
+        None, vol.All(vol.Coerce(int), vol.Range(min=0, max=1440))
+    ),
+    vol.Optional("schedule_mode"): vol.In(SCHEDULE_MODES),
+    vol.Optional("active_months"): [vol.All(vol.Coerce(int), vol.Range(min=1, max=12))],
+}
 
 SERVICE_RESET_SCHEMA = vol.Schema(
     {
@@ -46,15 +58,37 @@ SERVICE_CREATE_SCHEMA = vol.Schema(
         vol.Optional("description"): cv.string,
         vol.Optional("url"): cv.string,
         vol.Optional("icon"): cv.icon,
+        **TASK_OPTION_FIELDS,
     }
 )
 
 SERVICE_ENTITY_SCHEMA = vol.Schema({vol.Required("entity_id"): cv.entity_id})
-SERVICE_SNOOZE_SCHEMA = vol.Schema(
-    {
-        vol.Required("entity_id"): cv.entity_id,
-        vol.Required("days"): vol.All(int, vol.Range(min=1, max=3650)),
-    }
+
+
+def _require_snooze_length(value: dict) -> dict:
+    """Reject snoozes of zero days and zero hours."""
+    if value["days"] + value["hours"] < 1:
+        msg = "Set at least one day or one hour"
+        raise vol.Invalid(msg)
+    return value
+
+
+SERVICE_SNOOZE_SCHEMA = vol.All(
+    vol.Schema(
+        {
+            vol.Required("entity_id"): cv.entity_id,
+            vol.Optional("days", default=0): vol.All(
+                vol.Coerce(int), vol.Range(min=0, max=3650)
+            ),
+            vol.Optional("hours", default=0): vol.All(
+                vol.Coerce(int), vol.Range(min=0, max=720)
+            ),
+        }
+    ),
+    _require_snooze_length,
+)
+SERVICE_SET_OPTIONS_SCHEMA = vol.Schema(
+    {vol.Required("entity_id"): cv.entity_id, **TASK_OPTION_FIELDS}
 )
 
 CONFIG_STEP_USER_DATA_SCHEMA = vol.Schema(
