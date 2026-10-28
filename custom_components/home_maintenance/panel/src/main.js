@@ -12,7 +12,7 @@ const I18N = {
     newTask: "New task", editTask: "Edit task", import: "Import", export: "Export",
     done: "Done", later2h: "In 2 hours", tomorrow: "Tomorrow", skip: "Skip", edit: "Edit", history: "History", delete: "Delete", save: "Save changes", create: "Create task", cancel: "Cancel", close: "Close",
     tabBasics: "Basics", tabSchedule: "Schedule", tabChecklist: "Checklist", tabMore: "More",
-    title: "Name", titlePh: "e.g. Clean the bathroom", icon: "Icon", description: "Notes", url: "Reference link", labels: "Labels", noLabels: "No labels yet. Create them in Settings → Labels.",
+    title: "Name", titlePh: "e.g. Clean the bathroom", icon: "Icon", description: "Notes", url: "Reference link", openLink: "Open reference link", labels: "Labels", noLabels: "No labels yet. Create them in Settings → Labels.",
     every: "Repeat every", everyN: "Every {n} {unit}", every1_days: "Every day", every1_weeks: "Every week", every1_months: "Every month", every1_years: "Every year", lastPerformed: "Last done", days: "days", weeks: "weeks", months: "months", years: "years",
     scheduleMode: "How the next date is set", modeInterval: "From when I do it", modeIntervalHint: "Done late? The next one moves later too.", modeFixed: "Fixed rhythm", modeFixedHint: "Keeps the same weekday or day of the month.",
     priority: "Priority", prioHigh: "High", prioNormal: "Normal", prioLow: "Low", duration: "Estimated minutes",
@@ -34,7 +34,7 @@ const I18N = {
     newTask: "Nuova attività", editTask: "Modifica attività", import: "Importa", export: "Esporta",
     done: "Fatto", later2h: "Tra 2 ore", tomorrow: "Domani", skip: "Salta", edit: "Modifica", history: "Storico", delete: "Elimina", save: "Salva modifiche", create: "Crea attività", cancel: "Annulla", close: "Chiudi",
     tabBasics: "Base", tabSchedule: "Pianificazione", tabChecklist: "Checklist", tabMore: "Avanzate",
-    title: "Nome", titlePh: "es. Pulizia bagno", icon: "Icona", description: "Note", url: "Link di riferimento", labels: "Etichette", noLabels: "Nessuna etichetta. Puoi crearle da Impostazioni → Etichette.",
+    title: "Nome", titlePh: "es. Pulizia bagno", icon: "Icona", description: "Note", url: "Link di riferimento", openLink: "Apri il link di riferimento", labels: "Etichette", noLabels: "Nessuna etichetta. Puoi crearle da Impostazioni → Etichette.",
     every: "Ripeti ogni", everyN: "Ogni {n} {unit}", every1_days: "Ogni giorno", every1_weeks: "Ogni settimana", every1_months: "Ogni mese", every1_years: "Ogni anno", lastPerformed: "Ultima volta", days: "giorni", weeks: "settimane", months: "mesi", years: "anni",
     scheduleMode: "Come si calcola la prossima data", modeInterval: "Da quando la faccio", modeIntervalHint: "Se la fai in ritardo, slitta anche la successiva.", modeFixed: "Ritmo fisso", modeFixedHint: "Resta sempre lo stesso giorno della settimana o del mese.",
     priority: "Priorità", prioHigh: "Alta", prioNormal: "Media", prioLow: "Bassa", duration: "Minuti stimati",
@@ -102,6 +102,10 @@ button{cursor:pointer}
 .focus .facts{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 0;color:var(--mute);font-size:14px}
 .focus .facts .late{color:var(--bad);font-weight:600}
 .focus .note{margin:10px 0 0;color:var(--mute);max-width:70ch}
+.link{display:inline-flex;align-items:center;gap:6px;color:var(--accent);font-weight:600;text-decoration:none}
+.link:hover{text-decoration:underline}
+.link ha-icon{--mdc-icon-size:16px}
+a.btn{color:inherit;text-decoration:none}
 .focus .do{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
 .focus .do .btn.good{min-width:120px}
 
@@ -290,6 +294,7 @@ function dueDate(task) {
   return due;
 }
 
+const safeUrl = (u) => { try { const x = new URL(String(u || "")); return x.protocol === "http:" || x.protocol === "https:" ? x.href : ""; } catch { return ""; } };
 const priorityOf = (t) => (["high", "normal", "low"].includes(t.priority) ? t.priority : "normal");
 const snoozedNow = (t) => { const s = parseDate(t.snoozed_until); return !!s && s > new Date(); };
 const offSeason = (t) => Array.isArray(t.active_months) && t.active_months.length > 0 && t.active_months.length < 12 && !t.active_months.includes(new Date().getMonth() + 1);
@@ -419,6 +424,7 @@ class HomeMaintenancePanel extends HTMLElement {
         <h2 id="now-title">${esc(next.title)}</h2>
         <div class="facts">${facts}</div>
         ${next.description ? `<p class="note">${esc(next.description)}</p>` : ""}
+        ${safeUrl(next.url) ? `<p class="note"><a class="link" href="${esc(safeUrl(next.url))}" target="_blank" rel="noopener noreferrer"><ha-icon icon="mdi:open-in-new"></ha-icon>${esc(this._t("openLink"))}</a></p>` : ""}
         ${this._stepsHtml(next)}
         <div class="do">
           <button class="btn good" data-act="complete" data-id="${esc(next.id)}" ${busy}><ha-icon icon="mdi:check"></ha-icon>${esc(this._t("done"))}</button>
@@ -517,6 +523,7 @@ class HomeMaintenancePanel extends HTMLElement {
       <div class="t-actions">
         <button class="btn${due ? " due" : ""}" data-act="complete" data-id="${esc(t.id)}" ${busy}><ha-icon icon="mdi:check"></ha-icon>${esc(this._t("done"))}</button>
         <div class="more">
+          ${safeUrl(t.url) ? `<a class="btn icon quiet" href="${esc(safeUrl(t.url))}" target="_blank" rel="noopener noreferrer" title="${esc(this._t("openLink"))}" aria-label="${esc(this._t("openLink"))}"><ha-icon icon="mdi:open-in-new"></ha-icon></a>` : ""}
           <button class="btn icon quiet" data-act="history" data-id="${esc(t.id)}" title="${esc(this._t("history"))}" aria-label="${esc(this._t("history"))}"><ha-icon icon="mdi:history"></ha-icon></button>
           <button class="btn icon quiet" data-act="edit" data-id="${esc(t.id)}" title="${esc(this._t("edit"))}" aria-label="${esc(this._t("edit"))}"><ha-icon icon="mdi:pencil-outline"></ha-icon></button>
         </div>
