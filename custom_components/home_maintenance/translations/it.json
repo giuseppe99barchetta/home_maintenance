@@ -20,7 +20,11 @@
       "init": {
         "data": {
           "admin_only": "Limita il pannello ai soli amministratori",
-          "sidebar_title": "Nome mostrato nella barra laterale per questa integrazione."
+          "sidebar_title": "Nome mostrato nella barra laterale per questa integrazione.",
+          "ai_task_entity": "AI Task per i suggerimenti (vuoto = predefinita di Home Assistant)"
+        },
+        "data_description": {
+          "ai_task_entity": "Usata da «Compila con AI» e «Suggerisci passaggi» nel pannello."
         }
       }
     }

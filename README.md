@@ -16,6 +16,7 @@ Maintained by **Giuseppe Barchetta** ([@giuseppe99barchetta](https://github.com/
 - 🎯 A **Next maintenance task** sensor that always points at the single most important job
 - ☑️ **Checklists**: split a task into small steps and tick them one at a time
 - 🔥 **Weekly streak** of weeks with no high-priority task left overdue
+- ✨ **AI suggestions** with the AI already set up in Home Assistant: describe a task and get it filled in, or get checklist steps
 - ↷ **Skip** only the current occurrence while preserving history
 - 🔔 Configurable Home Assistant persistent notifications before a task is due
 - 🏷️ Search, status filters and grouping by Home Assistant labels
@@ -110,6 +111,15 @@ actions:
 - **Fixed rhythm** (`fixed`): the task keeps its original rhythm. A weekly task due on Monday and completed on Wednesday is due again next Monday, not next Wednesday. Missed slots are skipped instead of piling up.
 
 **Active months** limit a task to part of the year. Outside those months the task is not due, and its due date moves to the first day of the next active month.
+
+## ✨ AI suggestions
+
+Home Maintenance can use the AI you already set up in Home Assistant (any integration that provides an **AI Task** entity, such as OpenAI, Google Generative AI, Anthropic or Ollama). It never stores API keys or talks to a model directly: it calls `ai_task.generate_data` and asks for structured data.
+
+- **Fill in with AI**: when creating a task, describe it in your own words (for example "clean the dishwasher filter") and the AI fills in name, frequency, priority, estimated minutes, icon, notes and checklist steps.
+- **Suggest steps with AI**: in the Checklist tab, get steps for the task you are editing. Steps you already have are kept and duplicates are skipped.
+
+Suggestions only fill the form: nothing is created or changed until you save. Every answer is validated (interval, priority, icon format, number of steps, months) before it reaches the form. Choose which AI Task to use in the integration options; leave it empty to use Home Assistant's default. Local models can take a minute to answer. The AI controls are hidden when no AI Task entity is available.
 
 ## ☑️ Checklists
 

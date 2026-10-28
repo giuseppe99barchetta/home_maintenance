@@ -1,13 +1,14 @@
 """End-to-end tests for priorities, schedules, seasons and the next-task sensor."""
 
 from datetime import datetime, timedelta
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 
 pytest.importorskip("pytest_homeassistant_custom_component")
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
@@ -303,3 +304,78 @@ async def test_streak_sensor_and_statistics(
     assert state.attributes["current_week_ok"] is False
     assert state.attributes["tracked_tasks"] == 1
     assert hass.data[DOMAIN]["store"].statistics()["streak"]["current"] == 4
+
+
+async def test_ai_suggestions_go_through_ai_task(
+    hass: HomeAssistant, hass_ws_client: Any
+) -> None:
+    await _setup(hass)
+    client = await hass_ws_client(hass)
+
+    await client.send_json({"id": 1, "type": "home_maintenance/ai_status"})
+    status = (await client.receive_json())["result"]
+    assert status == {"available": False, "entities": [], "entity_id": None}
+
+    await client.send_json(
+        {"id": 2, "type": "home_maintenance/ai_suggest_task", "description": "x"}
+    )
+    assert (await client.receive_json())["error"]["code"] == "ai_failed"
+
+    calls: list[dict] = []
+
+    async def generate(call: ServiceCall) -> dict:
+        calls.append(dict(call.data))
+        if "checklist suggestion" in call.data["task_name"]:
+            return {"data": {"checklist": ["Smonta", "Lava", "Rimonta"]}}
+        return {
+            "data": {
+                "title": "Filtro lavastoviglie",
+                "interval_value": 1,
+                "interval_type": "months",
+                "priority": "normal",
+                "icon": "mdi:dishwasher",
+                "checklist": ["Smonta", "Lava"],
+            }
+        }
+
+    hass.services.async_register(
+        "ai_task", "generate_data", generate, supports_response=SupportsResponse.ONLY
+    )
+    hass.states.async_set("ai_task.fake", "unknown", {"friendly_name": "Fake AI"})
+
+    await client.send_json({"id": 3, "type": "home_maintenance/ai_status"})
+    status = (await client.receive_json())["result"]
+    assert status["available"] is True
+    assert status["entities"] == [{"entity_id": "ai_task.fake", "name": "Fake AI"}]
+
+    await client.send_json(
+        {
+            "id": 4,
+            "type": "home_maintenance/ai_suggest_task",
+            "description": "pulire il filtro della lavastoviglie",
+        }
+    )
+    proposal = (await client.receive_json())["result"]
+    assert proposal["title"] == "Filtro lavastoviglie"
+    assert proposal["checklist"] == ["Smonta", "Lava"]
+    assert "pulire il filtro della lavastoviglie" in calls[-1]["instructions"]
+    assert "entity_id" not in calls[-1]  # Home Assistant's default AI Task
+
+    # With an AI Task chosen in the options, it is passed explicitly.
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, "ai_task_entity": "ai_task.fake"}
+    )
+    await client.send_json(
+        {
+            "id": 5,
+            "type": "home_maintenance/ai_suggest_steps",
+            "title": "Pulizia bagno",
+        }
+    )
+    assert (await client.receive_json())["result"] == {
+        "checklist": ["Smonta", "Lava", "Rimonta"]
+    }
+    assert calls[-1]["entity_id"] == "ai_task.fake"
+    # Suggestions never create anything by themselves.
+    assert _task_entities(hass) == {}
