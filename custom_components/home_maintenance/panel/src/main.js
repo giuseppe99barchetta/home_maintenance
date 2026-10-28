@@ -48,10 +48,11 @@ function dueDate(task) {
   if (!due) { const last = parseDate(task.last_performed); if (!last) return null; due = addInterval(last, Number(task.interval_value), task.interval_type); }
   const snooze = parseDate(task.snoozed_until); if (snooze && snooze > due) due = new Date(snooze);
   const months = Array.isArray(task.active_months) ? task.active_months : [];
-  if (months.length && months.length < 12 && !months.includes(due.getMonth() + 1)) {
-    const d = new Date(due.getFullYear(), due.getMonth(), 1);
-    for (let i = 0; i < 12; i++) { d.setMonth(d.getMonth() + 1); if (months.includes(d.getMonth() + 1)) { due = d; break; } }
-  }
+  const seasonal = months.length && months.length < 12;
+  const nextActive = (from) => { const d = new Date(from.getFullYear(), from.getMonth(), 1); for (let i = 0; i < 12; i++) { d.setMonth(d.getMonth() + 1); if (months.includes(d.getMonth() + 1)) return d; } return from; };
+  if (seasonal && !months.includes(due.getMonth() + 1)) due = nextActive(due);
+  const today = new Date(); today.setHours(0,0,0,0);
+  if (seasonal && !months.includes(today.getMonth() + 1) && due <= today) due = nextActive(today);
   due.setHours(0,0,0,0); return due;
 }
 

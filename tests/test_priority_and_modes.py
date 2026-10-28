@@ -118,3 +118,44 @@ def test_new_fields_get_safe_defaults_and_cleaning() -> None:
     assert task.duration_minutes is None
     assert task.schedule_mode == "interval"
     assert task.active_months == [3, 11]
+
+
+def test_fixed_monthly_chain_keeps_month_end() -> None:
+    anchor = datetime(2026, 1, 31, tzinfo=TZ)
+    due = anchor
+    seen = []
+    for _ in range(4):
+        due = next_fixed_occurrence(anchor, due, 1, "months", current_due=due)
+        seen.append(due.date().isoformat())
+    assert seen == ["2026-02-28", "2026-03-31", "2026-04-30", "2026-05-31"]
+
+
+def test_fixed_yearly_leap_day_returns_on_leap_years() -> None:
+    anchor = datetime(2024, 2, 29, tzinfo=TZ)
+    due = anchor
+    seen = []
+    for _ in range(4):
+        due = next_fixed_occurrence(anchor, due, 1, "years", current_due=due)
+        seen.append(due.date().isoformat())
+    assert seen == ["2025-02-28", "2026-02-28", "2027-02-28", "2028-02-29"]
+
+
+def test_fixed_early_completion_never_returns_current_slot() -> None:
+    anchor = datetime(2026, 1, 31, tzinfo=TZ)
+    current = datetime(2026, 2, 28, tzinfo=TZ)
+    completed = datetime(2026, 2, 20, tzinfo=TZ)
+    nxt = next_fixed_occurrence(anchor, completed, 1, "months", current_due=current)
+    assert nxt.date().isoformat() == "2026-03-31"
+
+
+def test_overdue_task_is_deferred_when_season_ends() -> None:
+    task = _task(
+        last_performed="2026-09-14T00:00:00+02:00",
+        active_months=[5, 6, 7, 8, 9],
+    )
+    assert not is_due(task, NOW)
+    assert effective_due_date(task, NOW).date().isoformat() == "2027-05-01"
+    # Still in season (late September): it is due as usual.
+    september = datetime(2026, 9, 25, 10, tzinfo=TZ)
+    assert is_due(task, september)
+    assert effective_due_date(task, september).date().isoformat() == "2026-09-21"

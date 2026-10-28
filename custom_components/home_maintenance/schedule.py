@@ -38,23 +38,30 @@ def calculate_next_due(
 
 
 def next_fixed_occurrence(
-    due: datetime,
+    anchor: datetime,
     completed: datetime,
     interval_value: int,
     interval_type: str,
+    *,
+    current_due: datetime | None = None,
 ) -> datetime:
     """
-    Return the next anchored occurrence after a completion.
+    Return the next occurrence of a fixed-rhythm series after a completion.
 
-    Fixed schedules keep the original rhythm: the next due date is the first
-    multiple of the interval after the current due date that falls after the
-    completion day. Completing early (or on time) moves to the next slot;
-    completing late skips the slots that were missed instead of drifting.
-    Multiples are computed from the anchor so month-end clamping never drifts.
+    Every occurrence is computed from the original, unclamped ``anchor``
+    (anchor + k * interval), never from the previous occurrence, so month-end
+    and leap-day clamping can never drift the rhythm: a series anchored on
+    January 31 goes Feb 28, Mar 31, Apr 30. The result is the first
+    occurrence strictly after the completion day and after ``current_due``,
+    so completing early moves to the next slot and completing late skips the
+    missed slots instead of piling them up.
     """
+    after = completed.date()
+    if current_due is not None and current_due.date() > after:
+        after = current_due.date()
     for step in range(1, _MAX_FIXED_STEPS + 1):
-        candidate = calculate_next_due(due, interval_value * step, interval_type)
-        if candidate.date() > completed.date():
+        candidate = calculate_next_due(anchor, interval_value * step, interval_type)
+        if candidate.date() > after:
             return candidate
     msg = "Could not find the next fixed occurrence."
     raise ValueError(msg)
@@ -99,7 +106,6 @@ def _parse(value: str | None) -> datetime | None:
 
 def effective_due_date(task: dict, now: datetime | None = None) -> datetime | None:
     """Return the task's effective due date after skip/snooze/season overrides."""
-    del now
     override = task.get("next_due_override")
     if override:
         due = _parse(override)
@@ -120,7 +126,12 @@ def effective_due_date(task: dict, now: datetime | None = None) -> datetime | No
     if snoozed is not None and snoozed > due:
         due = snoozed
 
-    due = shift_into_season(due, task.get("active_months"))
+    months = task.get("active_months")
+    due = shift_into_season(due, months)
+    if now is not None and not in_season(task, now) and due.date() <= now.date():
+        # Still pending when the season ended: wait for the next active month
+        # instead of staying overdue through the whole off-season.
+        due = shift_into_season(now, months)
     return due.replace(hour=0, minute=0, second=0, microsecond=0)
 
 

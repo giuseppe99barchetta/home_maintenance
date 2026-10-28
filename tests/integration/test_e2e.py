@@ -1,6 +1,6 @@
 """End-to-end tests for priorities, schedules, seasons and the next-task sensor."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -162,3 +162,34 @@ async def test_legacy_storage_gets_defaults(
     assert attrs["priority"] == "normal"
     assert attrs["schedule_mode"] == "interval"
     assert attrs["active_months"] == []
+
+
+async def test_fixed_monthly_rhythm_survives_successive_completions(
+    hass: HomeAssistant,
+) -> None:
+    await _setup(hass)
+    await _call(
+        hass,
+        "create_task",
+        {"title": "Month end", "interval_value": 1, "interval_type": "months"},
+    )
+    entity_id = _task_entities(hass)["Month end"]
+    store = hass.data[DOMAIN]["store"]
+    task_id = er.async_get(hass).async_get(entity_id).unique_id
+    tz = dt_util.get_default_time_zone()
+    store.update_task(
+        task_id,
+        {"last_performed": "2025-12-31T00:00:00+01:00", "schedule_mode": "fixed"},
+    )
+
+    seen = []
+    for day in ("2026-01-31", "2026-02-28", "2026-03-31"):
+        done = datetime.fromisoformat(day).replace(tzinfo=tz)
+        store.complete_task(task_id, done)
+        seen.append(store.get(task_id)["next_due_override"][:10])
+    assert seen == ["2026-02-28", "2026-03-31", "2026-04-30"]
+    assert store.get(task_id)["schedule_anchor"][:10] == "2026-01-31"
+
+    # Changing the interval starts a new series.
+    store.update_task(task_id, {"interval_value": 2})
+    assert store.get(task_id)["schedule_anchor"] is None
