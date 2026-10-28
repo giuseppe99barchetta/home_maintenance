@@ -1,6 +1,6 @@
 {
   "name": "home-maintenance-panel",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "description": "Frontend panel for the Home Maintenance Home Assistant integration",
   "scripts": {

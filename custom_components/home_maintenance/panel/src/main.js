@@ -1,4 +1,4 @@
-const VERSION = "2.2.0";
+const VERSION = "2.3.0";
 const DAY_MS = 86_400_000;
 const PRIORITY_WEIGHT = { high: 100, normal: 50, low: 0 };
 const INTERVALS = ["days", "weeks", "months", "years"];
@@ -20,6 +20,7 @@ const I18N = {
     steps: "Steps", stepPh: "Step {n}", addStep: "Add step", removeStep: "Remove step", noSteps: "Split a long task into small steps you can tick one by one.", autocomplete: "Mark the task done when the last step is ticked",
     notify: "Notify before it's due", notifyDays: "Days before", tag: "NFC tag", noTag: "No tag", smartEntity: "Complete automatically when this entity…", smartState: "…reaches this state",
     presets: "Start from a preset",
+    aiTitle: "Describe the task", aiPh: "e.g. clean the dishwasher filter", aiFill: "Fill in with AI", aiWorking: "Preparing a proposal…", aiHint: "Uses the AI set up in Home Assistant. Local models can take a minute.", aiDone: "Proposal ready: check the fields, then create the task.", aiSteps: "Suggest steps with AI", aiStepsWorking: "Thinking of steps…", aiStepsDone: "Added {n} steps. Edit them as you like.", aiStepsNone: "No new steps to add.", aiNeedText: "Describe the task first.", aiNeedTitle: "Give the task a name first.", aiError: "The AI didn't answer: {msg}",
     dueToday: "Due today", overdueBy: "{days} days late", overdueBy1: "1 day late", dueIn: "In {days} days", dueIn1: "Tomorrow", offSeason: "Off season", snoozedUntil: "Snoozed", unknown: "No date",
     neverDone: "Never done", lastDone: "Last done {date}", minutes: "{n} min", stepsProgress: "{done}/{total} steps",
     noTasks: "Nothing here yet", noTasksHint: "Create your first recurring task, or start from a preset.", noMatch: "No tasks match this search.",
@@ -42,6 +43,7 @@ const I18N = {
     steps: "Passaggi", stepPh: "Passaggio {n}", addStep: "Aggiungi passaggio", removeStep: "Rimuovi passaggio", noSteps: "Dividi un'attività lunga in piccoli passaggi da spuntare uno alla volta.", autocomplete: "Segna l'attività come fatta quando spunto l'ultimo passaggio",
     notify: "Notifica prima della scadenza", notifyDays: "Giorni prima", tag: "Tag NFC", noTag: "Nessun tag", smartEntity: "Completa da sola quando questa entità…", smartState: "…raggiunge questo stato",
     presets: "Parti da un preset",
+    aiTitle: "Descrivi l'attività", aiPh: "es. pulire il filtro della lavastoviglie", aiFill: "Compila con AI", aiWorking: "Sto preparando la proposta…", aiHint: "Usa l'AI configurata in Home Assistant. Con i modelli locali può volerci un minuto.", aiDone: "Proposta pronta: controlla i campi e poi crea l'attività.", aiSteps: "Suggerisci passaggi con AI", aiStepsWorking: "Sto pensando ai passaggi…", aiStepsDone: "Ho aggiunto {n} passaggi: modificali come preferisci.", aiStepsNone: "Nessun passaggio nuovo da aggiungere.", aiNeedText: "Prima descrivi l'attività.", aiNeedTitle: "Prima dai un nome all'attività.", aiError: "L'AI non ha risposto: {msg}",
     dueToday: "Scade oggi", overdueBy: "In ritardo di {days} giorni", overdueBy1: "In ritardo di 1 giorno", dueIn: "Tra {days} giorni", dueIn1: "Domani", offSeason: "Fuori stagione", snoozedUntil: "Rimandata", unknown: "Senza data",
     neverDone: "Mai fatta", lastDone: "Ultima volta {date}", minutes: "{n} min", stepsProgress: "{done}/{total} passaggi",
     noTasks: "Ancora nessuna attività", noTasksHint: "Crea la prima attività ricorrente o parti da un preset.", noMatch: "Nessuna attività corrisponde alla ricerca.",
@@ -217,6 +219,15 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)!
 .step-row .num{color:var(--mute);font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
 .switch{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
 .switch input{width:18px;height:18px;margin-top:2px;accent-color:var(--accent)}
+.ai{padding:14px;border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));border-radius:var(--r-md);background:color-mix(in srgb,var(--accent) 6%,var(--card))}
+.ai-row{display:flex;gap:8px;align-items:flex-start}
+.ai-row textarea{flex:1;min-height:42px!important}
+.ai-row .btn{flex:none;min-height:42px}
+.ai small,#ai-steps-msg{color:var(--mute)}
+small.err,.ai small.err{color:var(--bad)}
+.row-btns{display:flex;flex-wrap:wrap;gap:8px}
+#ai-steps-msg:empty{display:none}
+@media(max-width:640px){.ai-row{flex-direction:column}.ai-row .btn{width:100%}}
 .presets{display:flex;flex-wrap:wrap;gap:6px}
 .presets button{border:1px dashed var(--line);background:transparent;border-radius:999px;padding:6px 12px;font-size:13.5px}
 .presets button:hover{border-style:solid;background:var(--raise)}
@@ -303,7 +314,7 @@ class HomeMaintenancePanel extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    Object.assign(this, { _hass: null, _narrow: false, _loaded: false, _tasks: [], _registry: [], _labels: [], _presets: [], _stats: {}, _config: {}, _search: "", _filter: "all", _view: "timeline", _sheet: null, _dialog: null, _busy: null, _toastTimer: null });
+    Object.assign(this, { _hass: null, _narrow: false, _loaded: false, _tasks: [], _registry: [], _labels: [], _presets: [], _stats: {}, _config: {}, _search: "", _filter: "all", _view: "timeline", _sheet: null, _dialog: null, _busy: null, _toastTimer: null, _ai: { available: false } });
     this._onKey = (e) => { if (e.key === "Escape" && (this._sheet || this._dialog)) { e.stopPropagation(); this._closeOverlay(); } };
     // Delegated listeners live on the shadow root, which survives re-renders.
     this.shadowRoot.addEventListener("click", (e) => { const el = e.target.closest("[data-act]"); if (el) { e.preventDefault(); this._act(el.dataset.act, el.dataset.id, el); } });
@@ -353,6 +364,7 @@ class HomeMaintenancePanel extends HTMLElement {
       const [config, registry, labels, presets] = await Promise.all([
         this._ws("get_config"), this._hass.callWS({ type: "config/entity_registry/list" }), this._hass.callWS({ type: "config/label_registry/list" }), this._ws("presets"),
       ]);
+      this._ai = await this._ws("ai_status").catch(() => ({ available: false }));
       Object.assign(this, { _config: config || {}, _registry: Array.isArray(registry) ? registry : [], _labels: Array.isArray(labels) ? labels : [], _presets: Array.isArray(presets) ? presets : [] });
       await this._refresh();
     } catch (e) {
@@ -557,6 +569,12 @@ class HomeMaintenancePanel extends HTMLElement {
       <div class="tabs" role="tablist">${tabs.map(([id, k]) => `<button type="button" role="tab" data-tab="${id}" aria-selected="${tab === id}">${esc(this._t(k))}${id === "checklist" ? `<span class="count" id="steps-count">${steps.length || ""}</span>` : ""}</button>`).join("")}</div>
       <div class="sheet-body">
         <div role="tabpanel" data-panel="basics" ${tab === "basics" ? "" : "hidden"}>
+          ${!editing && this._ai?.available ? `<div class="ai field">
+            <label for="f-ai">${esc(this._t("aiTitle"))}</label>
+            <div class="ai-row"><textarea id="f-ai" rows="2" maxlength="500" placeholder="${esc(this._t("aiPh"))}"></textarea>
+            <button type="button" class="btn" data-act="ai-fill"><ha-icon icon="mdi:creation-outline"></ha-icon><span>${esc(this._t("aiFill"))}</span></button></div>
+            <small id="ai-msg" role="status">${esc(this._t("aiHint"))}</small>
+          </div>` : ""}
           ${!editing && this._presets.length ? `<div class="field"><span class="lbl">${esc(this._t("presets"))}</span><div class="presets">${this._presets.map((p, i) => `<button type="button" data-preset="${i}">${esc(p.title)}</button>`).join("")}</div></div>` : ""}
           <div class="field"><label for="f-title">${esc(this._t("title"))}</label><input id="f-title" name="title" maxlength="120" required value="${esc(t.title || "")}" placeholder="${esc(this._t("titlePh"))}" autocomplete="off"><span class="err" id="title-err" hidden>${esc(this._t("titleRequired"))}</span></div>
           <div class="field"><label for="f-icon">${esc(this._t("icon"))}</label><input id="f-icon" name="icon" value="${esc(t.icon || "mdi:calendar-check")}" placeholder="mdi:broom" autocomplete="off"></div>
@@ -578,7 +596,8 @@ class HomeMaintenancePanel extends HTMLElement {
           <div class="field"><span class="lbl">${esc(this._t("steps"))}</span>
             <small id="steps-empty" ${steps.length ? "hidden" : ""}>${esc(this._t("noSteps"))}</small>
             <div class="step-edit" id="step-edit">${steps.map((s, i) => this._stepRow(s, i)).join("")}</div>
-            <div><button type="button" class="btn" data-act="add-step"><ha-icon icon="mdi:plus"></ha-icon>${esc(this._t("addStep"))}</button></div>
+            <div class="row-btns"><button type="button" class="btn" data-act="add-step"><ha-icon icon="mdi:plus"></ha-icon>${esc(this._t("addStep"))}</button>${this._ai?.available ? `<button type="button" class="btn quiet" data-act="ai-steps"><ha-icon icon="mdi:creation-outline"></ha-icon><span>${esc(this._t("aiSteps"))}</span></button>` : ""}</div>
+            <small id="ai-steps-msg" role="status"></small>
           </div>
           <label class="switch"><input type="checkbox" name="checklist_autocomplete" ${t.checklist_autocomplete === false ? "" : "checked"}><span>${esc(this._t("autocomplete"))}</span></label>
         </div>
@@ -638,7 +657,7 @@ class HomeMaintenancePanel extends HTMLElement {
       form.querySelector("#f-icon")?.addEventListener("input", (e) => root.querySelector("#icon-preview")?.setAttribute("icon", e.target.value || "mdi:calendar-check"));
       form.querySelector("#f-title")?.addEventListener("input", (e) => { root.querySelector("#title-err").hidden = true; if (!this._sheet.task?.id) root.querySelector("#sheet-title").textContent = e.target.value.trim() || this._t("newTask"); });
       form.querySelector("#step-edit")?.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.name === "checklist") { e.preventDefault(); this._addStep(form, e.target.closest(".step-row")); } });
-      requestAnimationFrame(() => this._sheet && (this._sheet.tab === "basics" ? form.querySelector("#f-title") : form.querySelector(`[data-panel="${this._sheet.tab}"] input:not([type=checkbox]):not([type=radio])`))?.focus());
+      requestAnimationFrame(() => this._sheet && (this._sheet.tab === "basics" ? form.querySelector("#f-ai") || form.querySelector("#f-title") : form.querySelector(`[data-panel="${this._sheet.tab}"] input:not([type=checkbox]):not([type=radio])`))?.focus());
     }
     root.querySelector(".dialog [autofocus], .dialog button")?.focus();
   }
@@ -678,6 +697,56 @@ class HomeMaintenancePanel extends HTMLElement {
     this.shadowRoot.querySelector("#icon-preview")?.setAttribute("icon", p.icon || "mdi:calendar-check");
     this.shadowRoot.querySelector("#sheet-title").textContent = p.title;
     form.elements.namedItem("title")?.focus();
+  }
+
+  async _aiCall(button, msgEl, workingKey, fn) {
+    const label = button.querySelector("span");
+    const idle = label.textContent;
+    button.disabled = true; label.textContent = this._t(workingKey);
+    msgEl.classList.remove("err");
+    try { return await fn(); }
+    catch (e) { console.error(e); msgEl.textContent = this._t("aiError", { msg: e?.message || e?.code || "?" }); msgEl.classList.add("err"); return null; }
+    finally { button.disabled = false; label.textContent = idle; }
+  }
+
+  async _aiFill(button) {
+    const form = this.shadowRoot.querySelector("#task-form");
+    const msg = this.shadowRoot.querySelector("#ai-msg");
+    const text = form.querySelector("#f-ai").value.trim();
+    if (!text) { msg.textContent = this._t("aiNeedText"); msg.classList.add("err"); form.querySelector("#f-ai").focus(); return; }
+    const p = await this._aiCall(button, msg, "aiWorking", () => this._ws("ai_suggest_task", { description: text }));
+    if (!p) return;
+    const set = (name, value) => { const el = form.elements.namedItem(name); if (el && "value" in el && value !== undefined && value !== null) el.value = value; };
+    set("title", p.title); set("icon", p.icon); set("description", p.description);
+    set("interval_value", p.interval_value); set("interval_type", p.interval_type);
+    set("duration_minutes", p.duration_minutes ?? "");
+    form.querySelectorAll('input[name="priority"]').forEach((r) => { r.checked = r.value === p.priority; });
+    form.querySelectorAll('input[name="active_months"]').forEach((c) => { c.checked = (p.active_months || []).includes(Number(c.value)); });
+    this._setSteps(form, p.checklist || []);
+    this.shadowRoot.querySelector("#icon-preview")?.setAttribute("icon", p.icon || "mdi:calendar-check");
+    this.shadowRoot.querySelector("#sheet-title").textContent = p.title;
+    this.shadowRoot.querySelector("#title-err").hidden = true;
+    msg.textContent = this._t("aiDone");
+  }
+
+  async _aiSteps(button) {
+    const form = this.shadowRoot.querySelector("#task-form");
+    const msg = this.shadowRoot.querySelector("#ai-steps-msg");
+    const title = String(form.elements.namedItem("title")?.value || "").trim();
+    if (!title) { msg.textContent = this._t("aiNeedTitle"); msg.classList.add("err"); return; }
+    const res = await this._aiCall(button, msg, "aiStepsWorking", () => this._ws("ai_suggest_steps", { title, description: String(form.elements.namedItem("description")?.value || "") }));
+    if (!res) return;
+    const current = [...form.querySelectorAll('#step-edit input[name="checklist"]')].map((i) => i.value.trim()).filter(Boolean);
+    const known = new Set(current.map((x) => x.toLowerCase()));
+    const fresh = (res.checklist || []).filter((x) => !known.has(String(x).toLowerCase()));
+    this._setSteps(form, [...current, ...fresh]);
+    msg.textContent = fresh.length ? this._t("aiStepsDone", { n: fresh.length }) : this._t("aiStepsNone");
+  }
+
+  _setSteps(form, steps) {
+    const box = form.querySelector("#step-edit");
+    box.innerHTML = steps.map((s, i) => this._stepRow(s, i)).join("");
+    this._renumberSteps(form);
   }
 
   _payload(form) {
@@ -737,6 +806,8 @@ class HomeMaintenancePanel extends HTMLElement {
       case "export": this._export(); return;
       case "add-step": this._addStep(this.shadowRoot.querySelector("#task-form")); return;
       case "remove-step": { const form = this.shadowRoot.querySelector("#task-form"); el.closest(".step-row")?.remove(); this._renumberSteps(form); return; }
+      case "ai-fill": return this._aiFill(el);
+      case "ai-steps": return this._aiSteps(el);
       case "complete": return this._run(id, "complete_task", {}, "completedToast");
       case "later": return this._run(id, "snooze_task", { hours: 2 }, "laterToast");
       case "tomorrow": return this._run(id, "snooze_task", { days: 1 }, "tomorrowToast");
