@@ -14,6 +14,8 @@ Maintained by **Giuseppe Barchetta** ([@giuseppe99barchetta](https://github.com/
 - 📌 **Fixed rhythm** schedules that keep their weekday or day-of-month even when you complete late
 - 🌦️ **Active months** for seasonal tasks (e.g. air-conditioner filters only in summer)
 - 🎯 A **Next maintenance task** sensor that always points at the single most important job
+- ☑️ **Checklists**: split a task into small steps and tick them one at a time
+- 🔥 **Weekly streak** of weeks with no high-priority task left overdue
 - ↷ **Skip** only the current occurrence while preserving history
 - 🔔 Configurable Home Assistant persistent notifications before a task is due
 - 🏷️ Search, status filters and grouping by Home Assistant labels
@@ -58,26 +60,18 @@ into your Home Assistant `custom_components` directory, then restart Home Assist
 
 ## 🧭 Using the panel
 
-The panel provides two main views:
+The panel opens on **Up next**: the single most important task due right now, in the same order as `sensor.home_maintenance_next_task`. Its checklist steps can be ticked in place, and it can be marked done, snoozed for two hours or skipped without leaving the page. Next to it, the weekly streak shows the current run and the last eight weeks.
 
-- **Timeline** groups tasks into overdue, due today, due soon and later.
-- **By label** groups tasks using Home Assistant labels.
+Below, every task is listed **by date** (overdue, due today, next 7 days, later) or **by label**, with search and filters for overdue, upcoming and snoozed tasks. Each row can be marked done, opened for editing or shown with its history.
 
-Each task can be completed, snoozed for three days, skipped, edited or deleted. The history dialog shows recorded completions and skipped occurrences.
+Creating or editing a task opens a side sheet (a bottom sheet on phones) with four tabs:
 
-When creating or editing a task you can configure:
+- **Basics**: name, icon, notes, reference link, labels, and quick presets for new tasks;
+- **Schedule**: interval, last done, schedule mode, priority, estimated minutes, active months;
+- **Checklist**: the steps, and whether ticking the last one completes the task;
+- **More**: notifications, NFC tag and automatic completion from an entity state.
 
-- title and recurrence interval;
-- last-performed date;
-- notes / description and a reference URL;
-- icon and Home Assistant labels;
-- NFC tag;
-- notification lead time;
-- an optional entity and target state for automatic completion;
-- priority and estimated duration;
-- schedule mode (from completion, or fixed rhythm) and active months.
-
-Quick presets are available for common jobs such as HVAC filters, smoke-detector checks, water filters and boiler servicing.
+Press Esc to close the sheet. Deleting a task asks for confirmation.
 
 ## 🔔 Notifications
 
@@ -117,6 +111,24 @@ actions:
 
 **Active months** limit a task to part of the year. Outside those months the task is not due, and its due date moves to the first day of the next active month.
 
+## ☑️ Checklists
+
+A task can have up to 30 steps. Ticked steps belong to the current occurrence only: they are cleared when the task is completed or skipped, and they survive restarts. With **complete when the last step is ticked** on (the default), ticking the final step completes the task and records the completion source as `checklist`. Changing the list of steps clears the progress.
+
+```yaml
+service: home_maintenance.check_step
+data:
+  entity_id: binary_sensor.clean_bathroom
+  step: 2          # step number (1 = first) or the exact step title
+  checked: true    # omit to toggle
+```
+
+## 🔥 Weekly streak
+
+`sensor.home_maintenance_streak` counts consecutive weeks (Monday to Sunday) in which no **high-priority** task was left overdue at the end of the week. Weeks with nothing due count as kept. It is rebuilt from the completion and skip history every time, so it stays correct after a restart or an import. Snoozes are not part of the history, so a past snooze counts as being late.
+
+Attributes: `best`, `current_week_ok`, `recent_weeks` (last eight finished weeks, oldest first), `weeks_tracked`, `tracked_tasks`. The same data is returned by the `statistics` WebSocket command under `streak`.
+
 ## 📲 NFC tags
 
 Associate a Home Assistant `tag.*` entity with a task. Scanning the underlying tag completes the task and records the completion source as NFC.
@@ -131,7 +143,8 @@ The integration exposes the following services:
 | `home_maintenance.complete_task` | Complete a task now |
 | `home_maintenance.reset_last_performed` | Complete a task using an optional historical date |
 | `home_maintenance.snooze_task` | Postpone a task by `days` and/or `hours` without changing completion history |
-| `home_maintenance.set_task_options` | Change priority, duration, schedule mode or active months |
+| `home_maintenance.set_task_options` | Change priority, duration, schedule mode, active months or checklist |
+| `home_maintenance.check_step` | Tick, untick or toggle one checklist step |
 | `home_maintenance.skip_task` | Skip only the current occurrence |
 | `home_maintenance.delete_task` | Permanently delete a task |
 
@@ -163,6 +176,7 @@ Home Maintenance fires these events:
 | `home_maintenance_task_completed` | A task is completed manually, through NFC or by an entity state |
 | `home_maintenance_task_skipped` | The current occurrence is skipped |
 | `home_maintenance_task_due` | A notification-enabled task enters or remains inside its due window |
+| `home_maintenance_step_checked` | A checklist step is ticked or unticked (includes step, index, done and total) |
 
 The completion event includes the task ID, title and completion source where available.
 
@@ -186,6 +200,7 @@ Each task is represented by a binary sensor and exposes useful attributes includ
 - `duration_minutes`
 - `schedule_mode`
 - `active_months` / `in_season`
+- `checklist` / `checklist_done` (titles of the ticked steps) / `checklist_progress` (e.g. `2/4`)
 
 The sensor turns on when the task is due or overdue.
 
