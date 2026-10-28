@@ -125,7 +125,7 @@ data:
 
 ## 🔥 Weekly streak
 
-`sensor.home_maintenance_streak` counts consecutive weeks (Monday to Sunday) in which no **high-priority** task was left overdue at the end of the week. Weeks with nothing due count as kept. It is rebuilt from the completion and skip history every time, so it stays correct after a restart or an import. Snoozes are not part of the history, so a past snooze counts as being late.
+`sensor.home_maintenance_streak` counts consecutive weeks (Monday to Sunday) in which no **high-priority** task was left overdue at the end of the week. Weeks with nothing due count as kept. It is rebuilt from the completion and skip history every time, using the same rules as the schedule (fixed-rhythm anchor and active months: a task still open when its season ends stops counting as late), so it stays correct after a restart or an import. Snoozes are not part of the history, so a past snooze counts as being late.
 
 Attributes: `best`, `current_week_ok`, `recent_weeks` (last eight finished weeks, oldest first), `weeks_tracked`, `tracked_tasks`. The same data is returned by the `statistics` WebSocket command under `streak`.
 

@@ -119,3 +119,53 @@ def test_task_from_dict_cleans_checklist() -> None:
     assert task.checklist == ["Sanitari", "Specchio"]
     assert task.checklist_done == [0]
     assert task.checklist_autocomplete is True
+
+
+def test_fixed_rhythm_uses_the_anchor() -> None:
+    # Weekly, anchored on Sunday Sep 27; done on Monday Oct 5 and Oct 12, so
+    # the slots of Oct 4 and Oct 11 were both answered late.
+    task = {
+        "priority": "high",
+        "interval_value": 1,
+        "interval_type": "weeks",
+        "schedule_mode": "fixed",
+        "schedule_anchor": "2026-09-27T00:00:00+02:00",
+        "last_performed": "2026-10-12T00:00:00+02:00",
+        "history": ["2026-10-05T00:00:00+02:00", "2026-10-12T00:00:00+02:00"],
+        "next_due_override": "2026-10-18T00:00:00+02:00",
+    }
+    now = datetime(2026, 10, 14, 10, tzinfo=TZ)
+    occ = task_occurrences(task, now)
+    assert [(o.due.isoformat(), o.done and o.done.isoformat()) for o in occ] == [
+        ("2026-10-11", "2026-10-12"),
+        ("2026-10-18", None),
+    ]
+    streak = compute_streak([task], now)
+    assert streak.recent_weeks == (False,)
+    assert streak.current == 0
+
+
+def test_season_end_stops_an_open_occurrence_being_overdue() -> None:
+    # May-September task due Sep 21 and never done: late until the season
+    # ends on Oct 1, then waiting for May without breaking the streak.
+    task = {
+        "priority": "high",
+        "interval_value": 1,
+        "interval_type": "weeks",
+        "active_months": [5, 6, 7, 8, 9],
+        "last_performed": "2026-09-14T00:00:00+02:00",
+        "history": ["2026-09-07T00:00:00+02:00", "2026-09-14T00:00:00+02:00"],
+    }
+    now = datetime(2026, 11, 25, 10, tzinfo=TZ)
+    occ = task_occurrences(task, now)
+    assert [(o.due.isoformat(), o.done and o.done.isoformat()) for o in occ] == [
+        ("2026-09-14", "2026-09-14"),
+        ("2026-09-21", "2026-10-01"),
+        ("2027-05-01", None),
+    ]
+    streak = compute_streak([task], now)
+    # Weeks of Sep 7 and Sep 14 kept, Sep 21 missed, Sep 28 to Nov 16 kept.
+    assert streak.weeks_tracked == 11
+    assert streak.current == 8
+    assert streak.best == 8
+    assert streak.current_week_ok is True
