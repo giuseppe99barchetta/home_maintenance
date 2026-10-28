@@ -105,6 +105,19 @@ create_task:
             - { label: October, value: "10" }
             - { label: November, value: "11" }
             - { label: December, value: "12" }
+    checklist:
+      name: Checklist
+      description: Steps of the task, one per entry. Progress resets after every completion.
+      required: false
+      selector:
+        text:
+          multiple: true
+    checklist_autocomplete:
+      name: Complete when all steps are ticked
+      required: false
+      default: true
+      selector:
+        boolean:
 
 complete_task:
   name: Complete task
@@ -229,3 +242,41 @@ set_task_options:
             - { label: October, value: "10" }
             - { label: November, value: "11" }
             - { label: December, value: "12" }
+    checklist:
+      name: Checklist
+      description: Steps of the task, one per entry. Progress resets after every completion.
+      required: false
+      selector:
+        text:
+          multiple: true
+    checklist_autocomplete:
+      name: Complete when all steps are ticked
+      required: false
+      default: true
+      selector:
+        boolean:
+
+check_step:
+  name: Check checklist step
+  description: Tick, untick or toggle one step of a task's checklist. Ticking the last open step completes the task when auto-complete is on.
+  fields:
+    entity_id:
+      name: Entity ID
+      required: true
+      selector:
+        entity:
+          domain: binary_sensor
+          integration: home_maintenance
+    step:
+      name: Step
+      description: Step number (1 = first step) or the exact step title.
+      required: true
+      example: "1"
+      selector:
+        text:
+    checked:
+      name: Checked
+      description: true ticks, false unticks; leave empty to toggle.
+      required: false
+      selector:
+        boolean:

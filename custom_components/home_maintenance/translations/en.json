@@ -29,6 +29,9 @@
     "sensor": {
       "next_task": {
         "name": "Next maintenance task"
+      },
+      "streak": {
+        "name": "Weekly streak"
       }
     }
   }

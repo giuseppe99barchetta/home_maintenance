@@ -29,6 +29,9 @@
     "sensor": {
       "next_task": {
         "name": "Nächste Wartungsaufgabe"
+      },
+      "streak": {
+        "name": "Wochenserie"
       }
     }
   }

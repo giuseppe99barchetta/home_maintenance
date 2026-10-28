@@ -13,6 +13,7 @@ from homeassistant.util import dt as dt_util
 
 from . import const
 from .schedule import due_queue, overdue_days, priority_of, priority_score
+from .streak import TRACKED_PRIORITY, compute_streak
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -29,7 +30,21 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Home Maintenance sensor platform."""
-    async_add_entities([HomeMaintenanceNextTaskSensor(hass)], update_before_add=True)
+    async_add_entities(
+        [HomeMaintenanceNextTaskSensor(hass), HomeMaintenanceStreakSensor(hass)],
+        update_before_add=True,
+    )
+
+
+def _hub_device_info() -> DeviceInfo:
+    """Return the Home Maintenance hub device."""
+    return DeviceInfo(
+        identifiers={(const.DOMAIN, const.DEVICE_KEY)},
+        name=const.NAME,
+        model=const.NAME,
+        sw_version=const.VERSION,
+        manufacturer=const.MANUFACTURER,
+    )
 
 
 class HomeMaintenanceNextTaskSensor(SensorEntity):
@@ -51,13 +66,7 @@ class HomeMaintenanceNextTaskSensor(SensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Attach the sensor to the Home Maintenance hub device."""
-        return DeviceInfo(
-            identifiers={(const.DOMAIN, const.DEVICE_KEY)},
-            name=const.NAME,
-            model=const.NAME,
-            sw_version=const.VERSION,
-            manufacturer=const.MANUFACTURER,
-        )
+        return _hub_device_info()
 
     def _entity_id_for(self, registry: er.EntityRegistry, task_id: str) -> str | None:
         """Return the binary_sensor entity ID of a task."""
@@ -89,4 +98,43 @@ class HomeMaintenanceNextTaskSensor(SensorEntity):
             **(top or {}),
             "due_count": len(queue),
             "queue": queue[:QUEUE_ATTRIBUTE_LIMIT],
+        }
+
+
+class HomeMaintenanceStreakSensor(SensorEntity):
+    """Consecutive weeks in which no high-priority task was left overdue."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "streak"
+    _attr_icon = "mdi:fire"
+    _attr_unique_id = f"{const.DOMAIN}_streak"
+    _attr_native_unit_of_measurement = "w"
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        """Initialize the sensor."""
+        self.hass = hass
+        self.entity_id = f"sensor.{const.DOMAIN}_streak"
+        self._attr_native_value = 0
+        self._attr_extra_state_attributes = {}
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Attach the sensor to the Home Maintenance hub device."""
+        return _hub_device_info()
+
+    async def async_update(self) -> None:
+        """Recompute the streak from the stored history."""
+        data = self.hass.data.get(const.DOMAIN) or {}
+        store = data.get("store")
+        if store is None:
+            return
+        streak = compute_streak(store.get_all(), dt_util.now())
+        self._attr_native_value = streak.current
+        self._attr_extra_state_attributes = {
+            "best": streak.best,
+            "current_week_ok": streak.current_week_ok,
+            "weeks_tracked": streak.weeks_tracked,
+            "tracked_tasks": streak.tracked_tasks,
+            "tracked_priority": TRACKED_PRIORITY,
+            "recent_weeks": list(streak.recent_weeks),
         }
