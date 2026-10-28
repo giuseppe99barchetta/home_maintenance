@@ -106,6 +106,18 @@ class HomeMaintenanceSensor(BinarySensorEntity):
             "schedule_mode": self.task.get("schedule_mode", "interval"),
             "active_months": self.task.get("active_months") or [],
             "in_season": in_season(self.task, now),
+            "checklist": list(self.task.get("checklist") or []),
+            "checklist_done": [
+                (self.task.get("checklist") or [])[i]
+                for i in self.task.get("checklist_done") or []
+                if i < len(self.task.get("checklist") or [])
+            ],
+            "checklist_progress": (
+                f"{len(self.task.get('checklist_done') or [])}"
+                f"/{len(self.task.get('checklist') or [])}"
+                if self.task.get("checklist")
+                else None
+            ),
         }
         if self.task.get("tag_id"):
             attrs["tag_id"] = self.task["tag_id"]

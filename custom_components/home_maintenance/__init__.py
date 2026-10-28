@@ -215,6 +215,29 @@ def _set_options_handler(
     return async_srv_set_options
 
 
+def _check_step_handler(
+    hass: HomeAssistant,
+) -> Callable[[ServiceCall], Coroutine[Any, Any, None]]:
+    """Return the check_step service handler."""
+
+    async def async_srv_check_step(call: ServiceCall) -> None:
+        """Tick, untick or toggle one checklist step."""
+        store = _store(hass)
+        if store is None:
+            msg = "Home Maintenance is not loaded"
+            raise HomeAssistantError(msg)
+        task_id = _task_id_from_entity(hass, call.data["entity_id"])
+        step = call.data["step"]
+        if isinstance(step, int):
+            step -= 1  # services use 1-based step numbers
+        try:
+            store.check_step(task_id, step, call.data.get("checked"))
+        except RuntimeError as err:
+            raise HomeAssistantError(str(err)) from err
+
+    return async_srv_check_step
+
+
 @callback
 def register_services(hass: HomeAssistant) -> None:
     """Register services exposed by Home Maintenance."""
@@ -257,6 +280,8 @@ def register_services(hass: HomeAssistant) -> None:
             duration_minutes=call.data.get("duration_minutes"),
             schedule_mode=call.data.get("schedule_mode", "interval"),
             active_months=call.data.get("active_months", []),
+            checklist=call.data.get("checklist", []),
+            checklist_autocomplete=call.data.get("checklist_autocomplete", True),
         )
         require_store().add(HomeMaintenanceTask.from_dict(attr.asdict(task)))
 
@@ -290,6 +315,11 @@ def register_services(hass: HomeAssistant) -> None:
         (const.SERVICE_SNOOZE, async_srv_snooze, const.SERVICE_SNOOZE_SCHEMA),
         (const.SERVICE_SKIP, async_srv_skip, const.SERVICE_ENTITY_SCHEMA),
         (const.SERVICE_DELETE, async_srv_delete, const.SERVICE_ENTITY_SCHEMA),
+        (
+            const.SERVICE_CHECK_STEP,
+            _check_step_handler(hass),
+            const.SERVICE_CHECK_STEP_SCHEMA,
+        ),
         (
             const.SERVICE_SET_OPTIONS,
             _set_options_handler(hass),

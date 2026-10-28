@@ -180,6 +180,8 @@ def websocket_add_task(
         duration_minutes=msg.get("duration_minutes"),
         schedule_mode=msg.get("schedule_mode", "interval"),
         active_months=msg.get("active_months", []),
+        checklist=msg.get("checklist", []),
+        checklist_autocomplete=msg.get("checklist_autocomplete", True),
     )
     task = HomeMaintenanceTask.from_dict(attr.asdict(task))
     try:
@@ -280,6 +282,24 @@ def websocket_skip_task(
         conn.send_error(msg["id"], "skip_failed", str(err))
         return
     _send_success(conn, msg)
+
+
+@callback
+def websocket_check_step(
+    hass: HomeAssistant,
+    conn: connection.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Tick, untick or toggle one checklist step (0-based index)."""
+    store = _get_store(hass, conn, msg)
+    if store is None:
+        return
+    try:
+        completed = store.check_step(msg["task_id"], msg["index"], msg.get("checked"))
+    except RuntimeError as err:
+        conn.send_error(msg["id"], "check_step_failed", str(err))
+        return
+    _send_success(conn, msg, {"success": True, "task_completed": completed})
 
 
 @callback
@@ -428,6 +448,16 @@ async def async_register_websockets(hass: HomeAssistant) -> None:
             vol.Required("task_id"): str,
             vol.Optional("days", default=0): vol.All(int, vol.Range(min=0, max=3650)),
             vol.Optional("hours", default=0): vol.All(int, vol.Range(min=0, max=720)),
+        },
+    )
+    _register_command(
+        hass,
+        "check_step",
+        websocket_check_step,
+        {
+            vol.Required("task_id"): str,
+            vol.Required("index"): vol.All(int, vol.Range(min=0)),
+            vol.Optional("checked"): bool,
         },
     )
     _register_command(hass, "statistics", websocket_statistics)

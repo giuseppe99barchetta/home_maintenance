@@ -6,7 +6,7 @@ from homeassistant.helpers import config_validation as cv
 
 from .schedule import PRIORITIES, SCHEDULE_MODES
 
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 NAME = "Home Maintenance"
 MANUFACTURER = "Giuseppe Barchetta"
 
@@ -25,6 +25,7 @@ DEVICE_KEY = "home_maintenance_hub"
 EVENT_TASK_COMPLETED = f"{DOMAIN}_task_completed"
 EVENT_TASK_SKIPPED = f"{DOMAIN}_task_skipped"
 EVENT_TASK_DUE = f"{DOMAIN}_task_due"
+EVENT_STEP_CHECKED = f"{DOMAIN}_step_checked"
 
 SERVICE_RESET = "reset_last_performed"
 SERVICE_CREATE = "create_task"
@@ -33,6 +34,7 @@ SERVICE_SNOOZE = "snooze_task"
 SERVICE_SKIP = "skip_task"
 SERVICE_DELETE = "delete_task"
 SERVICE_SET_OPTIONS = "set_task_options"
+SERVICE_CHECK_STEP = "check_step"
 
 TASK_OPTION_FIELDS = {
     vol.Optional("priority"): vol.In(PRIORITIES),
@@ -41,6 +43,8 @@ TASK_OPTION_FIELDS = {
     ),
     vol.Optional("schedule_mode"): vol.In(SCHEDULE_MODES),
     vol.Optional("active_months"): [vol.All(vol.Coerce(int), vol.Range(min=1, max=12))],
+    vol.Optional("checklist"): vol.Any([cv.string], cv.string),
+    vol.Optional("checklist_autocomplete"): cv.boolean,
 }
 
 SERVICE_RESET_SCHEMA = vol.Schema(
@@ -86,6 +90,16 @@ SERVICE_SNOOZE_SCHEMA = vol.All(
         }
     ),
     _require_snooze_length,
+)
+SERVICE_CHECK_STEP_SCHEMA = vol.Schema(
+    {
+        vol.Required("entity_id"): cv.entity_id,
+        # 1-based step number or the step title.
+        vol.Required("step"): vol.Any(
+            vol.All(vol.Coerce(int), vol.Range(min=1)), cv.string
+        ),
+        vol.Optional("checked"): cv.boolean,
+    }
 )
 SERVICE_SET_OPTIONS_SCHEMA = vol.Schema(
     {vol.Required("entity_id"): cv.entity_id, **TASK_OPTION_FIELDS}

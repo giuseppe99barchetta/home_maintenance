@@ -193,3 +193,113 @@ async def test_fixed_monthly_rhythm_survives_successive_completions(
     # Changing the interval starts a new series.
     store.update_task(task_id, {"interval_value": 2})
     assert store.get(task_id)["schedule_anchor"] is None
+
+
+async def test_checklist_steps_autocomplete_and_reset(
+    hass: HomeAssistant, hass_storage: dict
+) -> None:
+    await _setup(hass)
+    await _call(
+        hass,
+        "create_task",
+        {
+            "title": "Bathroom",
+            "interval_value": 1,
+            "interval_type": "weeks",
+            "checklist": ["Sanitari", "Specchio", "Pavimento"],
+        },
+    )
+    entity_id = _task_entities(hass)["Bathroom"]
+    await _call(hass, "check_step", {"entity_id": entity_id, "step": 1})
+    await _call(hass, "check_step", {"entity_id": entity_id, "step": "specchio"})
+    await _refresh(hass, entity_id)
+    attrs = hass.states.get(entity_id).attributes
+    assert attrs["checklist"] == ["Sanitari", "Specchio", "Pavimento"]
+    assert attrs["checklist_done"] == ["Sanitari", "Specchio"]
+    assert attrs["checklist_progress"] == "2/3"
+
+    # Toggling twice is a no-op; unchecking works.
+    await _call(hass, "check_step", {"entity_id": entity_id, "step": 2})
+    await _call(hass, "check_step", {"entity_id": entity_id, "step": 2})
+    await _call(
+        hass, "check_step", {"entity_id": entity_id, "step": 1, "checked": False}
+    )
+    await _refresh(hass, entity_id)
+    assert hass.states.get(entity_id).attributes["checklist_progress"] == "1/3"
+
+    # Progress is persisted.
+    await hass.async_block_till_done()
+    saved = next(
+        t
+        for t in hass_storage["home_maintenance.storage"]["data"]
+        if t["title"] == "Bathroom"
+    )
+    assert saved["checklist_done"] == [1]
+
+    with pytest.raises(HomeAssistantError):
+        await _call(hass, "check_step", {"entity_id": entity_id, "step": "nope"})
+
+    completed = []
+    hass.bus.async_listen(
+        "home_maintenance_task_completed", lambda e: completed.append(e.data)
+    )
+    for step in (1, 3):
+        await _call(hass, "check_step", {"entity_id": entity_id, "step": step})
+    await hass.async_block_till_done()
+    assert completed[-1]["source"] == "checklist"
+    await _refresh(hass, entity_id)
+    attrs = hass.states.get(entity_id).attributes
+    assert attrs["checklist_done"] == []
+    assert attrs["history_count"] == 1
+
+    # Changing the steps resets progress; disabling auto-complete is honoured.
+    await _call(hass, "check_step", {"entity_id": entity_id, "step": 1})
+    await _call(
+        hass,
+        "set_task_options",
+        {
+            "entity_id": entity_id,
+            "checklist": ["Solo pavimento"],
+            "checklist_autocomplete": False,
+        },
+    )
+    await _call(hass, "check_step", {"entity_id": entity_id, "step": 1})
+    await _refresh(hass, entity_id)
+    attrs = hass.states.get(entity_id).attributes
+    assert attrs["checklist_progress"] == "1/1"
+    assert attrs["history_count"] == 1
+
+
+async def test_streak_sensor_and_statistics(
+    hass: HomeAssistant, hass_storage: dict
+) -> None:
+    today = dt_util.now().date()
+    monday = today - timedelta(days=today.weekday())
+    weeks = [monday - timedelta(weeks=n) for n in (4, 3, 2, 1)]
+    history = [f"{d.isoformat()}T00:00:00+00:00" for d in weeks]
+    hass_storage["home_maintenance.storage"] = {
+        "version": 1,
+        "minor_version": 2,
+        "key": "home_maintenance.storage",
+        "data": [
+            {
+                "id": "home_maintenance_litter",
+                "title": "Litter",
+                "interval_value": 1,
+                "interval_type": "weeks",
+                "last_performed": history[-1],
+                "history": history,
+                "skipped": [],
+                "priority": "high",
+            }
+        ],
+    }
+    await _setup(hass)
+    await _refresh(hass, "sensor.home_maintenance_streak")
+    state = hass.states.get("sensor.home_maintenance_streak")
+    # Four completed weeks in a row; this week's occurrence is still open.
+    assert int(state.state) == 4
+    assert state.attributes["best"] == 4
+    assert state.attributes["current_week_ok"] is False
+    assert state.attributes["tracked_tasks"] == 1
+    assert hass.data[DOMAIN]["store"].statistics()["streak"]["current"] == 4

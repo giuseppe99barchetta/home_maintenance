@@ -22,6 +22,7 @@ from .schedule import (
     next_fixed_occurrence,
     normalize_months,
 )
+from .streak import compute_streak
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -69,6 +70,9 @@ class HomeMaintenanceTask:
     schedule_mode: str = attr.ib(default=DEFAULT_SCHEDULE_MODE)
     active_months: list[int] = attr.ib(factory=list)
     schedule_anchor: str | None = attr.ib(default=None)
+    checklist: list[str] = attr.ib(factory=list)
+    checklist_done: list[int] = attr.ib(factory=list)
+    checklist_autocomplete: bool = attr.ib(default=True)
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> HomeMaintenanceTask:
@@ -100,7 +104,47 @@ class HomeMaintenanceTask:
         )
         clean["duration_minutes"] = _clean_duration(clean.get("duration_minutes"))
         clean["active_months"] = normalize_months(clean.get("active_months"))
+        clean["checklist"] = normalize_checklist(clean.get("checklist"))
+        clean["checklist_done"] = normalize_done(
+            clean.get("checklist_done"), len(clean["checklist"])
+        )
+        clean["checklist_autocomplete"] = bool(
+            clean.get("checklist_autocomplete", True)
+        )
         return cls(**clean)
+
+
+MAX_CHECKLIST_STEPS = 30
+MAX_STEP_LENGTH = 120
+
+
+def normalize_checklist(value: Any) -> list[str]:
+    """Return trimmed, non-empty step titles (a string is split by lines)."""
+    if isinstance(value, str):
+        value = value.splitlines()
+    if not isinstance(value, (list, tuple)):
+        return []
+    steps = [
+        str(step).strip()[:MAX_STEP_LENGTH]
+        for step in value
+        if isinstance(step, (str, int, float))
+    ]
+    return [step for step in steps if step][:MAX_CHECKLIST_STEPS]
+
+
+def normalize_done(value: Any, total: int) -> list[int]:
+    """Return sorted, unique, in-range step indices."""
+    if not isinstance(value, (list, tuple)):
+        return []
+    done = set()
+    for index in value:
+        try:
+            number = int(index)
+        except (TypeError, ValueError):
+            continue
+        if 0 <= number < total:
+            done.add(number)
+    return sorted(done)
 
 
 def _clean_duration(value: Any) -> int | None:
@@ -110,6 +154,34 @@ def _clean_duration(value: Any) -> int | None:
     except (TypeError, ValueError):
         return None
     return minutes if minutes > 0 else None
+
+
+_EMPTY_TO_NONE = {"tag_id", "description", "url", "source_entity_id", "source_state"}
+
+
+_ALLOWED_VALUES = {"priority": PRIORITIES, "schedule_mode": SCHEDULE_MODES}
+_NORMALIZERS = {
+    "active_months": normalize_months,
+    "duration_minutes": _clean_duration,
+    "checklist": normalize_checklist,
+    "checklist_autocomplete": bool,
+}
+
+
+def _normalize_update(
+    task: HomeMaintenanceTask, key: str, value: Any, updated: dict[str, Any]
+) -> tuple[bool, Any]:
+    """Return (accepted, value) for one field of a task update."""
+    if key in _ALLOWED_VALUES:
+        return value in _ALLOWED_VALUES[key], value
+    if key in _EMPTY_TO_NONE:
+        value = value or None
+    elif key in _NORMALIZERS:
+        value = _NORMALIZERS[key](value)
+    elif key == "checklist_done":
+        total = len(normalize_checklist(updated.get("checklist", task.checklist)))
+        value = normalize_done(value, total)
+    return True, value
 
 
 class TaskStore:
@@ -237,31 +309,17 @@ class TaskStore:
 
         rhythm_before = {key: getattr(task, key) for key in _ANCHOR_RESET_KEYS}
         for key, value in updated.items():
-            if key == "labels":
+            if key == "labels" or not hasattr(task, key):
                 continue
-            normalized_value = (
-                value or None
-                if key
-                in {
-                    "tag_id",
-                    "description",
-                    "url",
-                    "source_entity_id",
-                    "source_state",
-                }
-                else value
-            )
-            if key == "active_months":
-                normalized_value = normalize_months(value)
-            elif key == "duration_minutes":
-                normalized_value = _clean_duration(value)
-            elif (key == "priority" and value not in PRIORITIES) or (
-                key == "schedule_mode" and value not in SCHEDULE_MODES
-            ):
+            accepted, normalized_value = _normalize_update(task, key, value, updated)
+            if not accepted:
                 continue
-            if hasattr(task, key):
-                setattr(task, key, normalized_value)
-                entity.task[key] = normalized_value
+            if key == "checklist" and normalized_value != task.checklist:
+                # Different steps: progress of the old list is meaningless.
+                task.checklist_done = []
+                entity.task["checklist_done"] = []
+            setattr(task, key, normalized_value)
+            entity.task[key] = normalized_value
 
         rhythm_after = {key: getattr(task, key) for key in _ANCHOR_RESET_KEYS}
         if rhythm_after != rhythm_before and "schedule_anchor" not in updated:
@@ -301,6 +359,7 @@ class TaskStore:
         task.last_performed = performed_date_str
         task.snoozed_until = None
         task.next_due_override = next_override
+        task.checklist_done = []
         task.history.append(performed_date_str)
         entity.task.update(attr.asdict(task))
         self.hass.async_create_task(entity.async_update_ha_state(force_refresh=True))
@@ -353,6 +412,7 @@ class TaskStore:
                 due, task.interval_value, task.interval_type
             ).isoformat()
         task.snoozed_until = None
+        task.checklist_done = []
         entity.task.update(attr.asdict(task))
         self.hass.async_create_task(entity.async_update_ha_state(force_refresh=True))
         self.hass.bus.async_fire(
@@ -361,7 +421,70 @@ class TaskStore:
         )
         self._save()
 
-    def statistics(self) -> dict[str, int]:
+    def check_step(
+        self,
+        task_id: str,
+        step: int | str,
+        checked: bool | None = None,
+    ) -> bool:
+        """
+        Tick or untick one checklist step of the current occurrence.
+
+        ``step`` is a 0-based index or a step title (case-insensitive);
+        ``checked=None`` toggles. Returns True when ticking the last open step
+        completed the whole task (only with ``checklist_autocomplete``).
+        """
+        entity, task = self._entity_and_task(task_id)
+        if not task.checklist:
+            msg = "This task has no checklist."
+            raise RuntimeError(msg)
+        index = self._step_index(task, step)
+        done = set(task.checklist_done)
+        should_check = index not in done if checked is None else checked
+        if should_check:
+            done.add(index)
+        else:
+            done.discard(index)
+        task.checklist_done = sorted(done)
+        self.hass.bus.async_fire(
+            const.EVENT_STEP_CHECKED,
+            {
+                "task_id": task_id,
+                "title": task.title,
+                "step": task.checklist[index],
+                "index": index,
+                "checked": should_check,
+                "done": len(task.checklist_done),
+                "total": len(task.checklist),
+            },
+        )
+        if (
+            should_check
+            and task.checklist_autocomplete
+            and len(task.checklist_done) == len(task.checklist)
+        ):
+            self.complete_task(task_id, source="checklist")
+            return True
+        entity.task["checklist_done"] = list(task.checklist_done)
+        self.hass.async_create_task(entity.async_update_ha_state(force_refresh=True))
+        self._save()
+        return False
+
+    @staticmethod
+    def _step_index(task: HomeMaintenanceTask, step: int | str) -> int:
+        """Resolve a step index or title to a valid 0-based index."""
+        if isinstance(step, int) and not isinstance(step, bool):
+            if 0 <= step < len(task.checklist):
+                return step
+        elif isinstance(step, str):
+            wanted = step.strip().casefold()
+            for index, title in enumerate(task.checklist):
+                if title.casefold() == wanted:
+                    return index
+        msg = f"Checklist step not found: {step}"
+        raise RuntimeError(msg)
+
+    def statistics(self) -> dict[str, Any]:
         """Return lightweight aggregate statistics."""
         completed = sum(len(task.history) for task in self._tasks.values())
         skipped = sum(len(task.skipped) for task in self._tasks.values())
@@ -371,6 +494,7 @@ class TaskStore:
             "completed": completed,
             "skipped": skipped,
             "snoozed": snoozed,
+            "streak": compute_streak(self.get_all(), dt_util.now()).as_dict(),
         }
 
     def export_data(self) -> list[dict[str, Any]]:
