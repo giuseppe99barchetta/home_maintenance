@@ -535,6 +535,7 @@ class HomeMaintenancePanel extends HTMLElement {
       <div class="t-actions">
         <button class="btn${due ? " due" : ""}" data-act="complete" data-id="${esc(t.id)}" ${busy}><ha-icon icon="mdi:check"></ha-icon>${esc(this._t("done"))}</button>
         <div class="more">
+          ${due ? [["later", "mdi:clock-outline", "later2h"], ["tomorrow", "mdi:calendar-arrow-right", "tomorrow"], ["skip", "mdi:skip-next", "skip"]].map(([act, icon, k]) => `<button class="btn icon quiet" data-act="${act}" data-id="${esc(t.id)}" title="${esc(this._t(k))}" aria-label="${esc(this._t(k))}" ${busy}><ha-icon icon="${icon}"></ha-icon></button>`).join("") : ""}
           ${safeUrl(t.url) ? `<a class="btn icon quiet" href="${esc(safeUrl(t.url))}" target="_blank" rel="noopener noreferrer" title="${esc(this._t("openLink"))}" aria-label="${esc(this._t("openLink"))}"><ha-icon icon="mdi:open-in-new"></ha-icon></a>` : ""}
           <button class="btn icon quiet" data-act="history" data-id="${esc(t.id)}" title="${esc(this._t("history"))}" aria-label="${esc(this._t("history"))}"><ha-icon icon="mdi:history"></ha-icon></button>
           <button class="btn icon quiet" data-act="edit" data-id="${esc(t.id)}" title="${esc(this._t("edit"))}" aria-label="${esc(this._t("edit"))}"><ha-icon icon="mdi:pencil-outline"></ha-icon></button>
