@@ -27,6 +27,7 @@ EVENT_TASK_COMPLETED = f"{DOMAIN}_task_completed"
 EVENT_TASK_SKIPPED = f"{DOMAIN}_task_skipped"
 EVENT_TASK_DUE = f"{DOMAIN}_task_due"
 EVENT_STEP_CHECKED = f"{DOMAIN}_step_checked"
+EVENT_RECAP = f"{DOMAIN}_recap"
 
 SERVICE_RESET = "reset_last_performed"
 SERVICE_CREATE = "create_task"
@@ -52,6 +53,7 @@ SERVICE_RESET_SCHEMA = vol.Schema(
     {
         vol.Required("entity_id"): cv.entity_id,
         vol.Optional("performed_date"): cv.string,
+        vol.Optional("user"): cv.string,
     }
 )
 
@@ -68,6 +70,10 @@ SERVICE_CREATE_SCHEMA = vol.Schema(
 )
 
 SERVICE_ENTITY_SCHEMA = vol.Schema({vol.Required("entity_id"): cv.entity_id})
+# Who completed the task, e.g. a person entity or a Telegram name.
+SERVICE_COMPLETE_SCHEMA = SERVICE_ENTITY_SCHEMA.extend(
+    {vol.Optional("user"): cv.string}
+)
 
 
 def _require_snooze_length(value: dict) -> dict:
@@ -100,6 +106,7 @@ SERVICE_CHECK_STEP_SCHEMA = vol.Schema(
             vol.All(vol.Coerce(int), vol.Range(min=1)), cv.string
         ),
         vol.Optional("checked"): cv.boolean,
+        vol.Optional("user"): cv.string,
     }
 )
 SERVICE_SET_OPTIONS_SCHEMA = vol.Schema(

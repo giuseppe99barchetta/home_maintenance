@@ -14,6 +14,12 @@ reset_last_performed:
       required: false
       selector:
         date:
+    user:
+      name: Completed by
+      description: Who did it, e.g. a person entity or a Telegram name. Defaults to the calling user.
+      required: false
+      selector:
+        text:
 
 create_task:
   name: Create task
@@ -130,6 +136,12 @@ complete_task:
         entity:
           domain: binary_sensor
           integration: home_maintenance
+    user:
+      name: Completed by
+      description: Who did it, e.g. a person entity or a Telegram name. Defaults to the calling user.
+      required: false
+      selector:
+        text:
 
 snooze_task:
   name: Snooze task
@@ -280,3 +292,9 @@ check_step:
       required: false
       selector:
         boolean:
+    user:
+      name: Completed by
+      description: Who did it, e.g. a person entity or a Telegram name. Defaults to the calling user.
+      required: false
+      selector:
+        text:

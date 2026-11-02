@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 
-from . import ai
+from . import ai, game
 from .const import DOMAIN, TASK_OPTION_FIELDS
 from .schedule import INTERVAL_TYPES
 from .store import HomeMaintenanceTask, TaskStore
@@ -230,18 +230,19 @@ def websocket_update_task(
     _send_success(conn, msg)
 
 
-@callback
-def websocket_complete_task(
+@websocket_api.async_response
+async def websocket_complete_task(
     hass: HomeAssistant,
     conn: connection.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Complete a maintenance task now."""
+    """Complete a maintenance task now, credited to the panel user."""
     store = _get_store(hass, conn, msg)
     if store is None:
         return
+    by = await game.async_resolve_by(hass, user_id=conn.user.id)
     try:
-        store.complete_task(msg["task_id"])
+        store.complete_task(msg["task_id"], by=by)
     except RuntimeError as err:
         conn.send_error(msg["id"], "complete_failed", str(err))
         return
@@ -286,8 +287,8 @@ def websocket_skip_task(
     _send_success(conn, msg)
 
 
-@callback
-def websocket_check_step(
+@websocket_api.async_response
+async def websocket_check_step(
     hass: HomeAssistant,
     conn: connection.ActiveConnection,
     msg: dict[str, Any],
@@ -296,8 +297,11 @@ def websocket_check_step(
     store = _get_store(hass, conn, msg)
     if store is None:
         return
+    by = await game.async_resolve_by(hass, user_id=conn.user.id)
     try:
-        completed = store.check_step(msg["task_id"], msg["index"], msg.get("checked"))
+        completed = store.check_step(
+            msg["task_id"], msg["index"], msg.get("checked"), by=by
+        )
     except RuntimeError as err:
         conn.send_error(msg["id"], "check_step_failed", str(err))
         return

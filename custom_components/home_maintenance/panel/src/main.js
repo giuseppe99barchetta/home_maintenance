@@ -8,6 +8,7 @@ const I18N = {
     now: "Up next", nothingNow: "Nothing to do right now", nothingNowHint: "Next one: {title}, {when}.", allClear: "No maintenance scheduled yet.",
     summary: "{overdue} overdue, {soon} in the next 7 days, {completed} completed so far",
     streakUnit: "weeks in a row", streakUnit1: "week in a row", streakBest: "Best: {n}", streakHint: "Weeks with no high-priority task left overdue.", streakEmpty: "Set some tasks to high priority to start a streak.", thisWeekOk: "This week is on track", thisWeekOpen: "Something is still open this week",
+    boardTitle: "This week's challenge", boardEmpty: "Mark a task as done to join the leaderboard.", boardMonth: "Month leader: {name} · {points} pts", pts: "pts", champion: "Champion", punctual: "Always on time", firefighter: "High-priority hero",
     search: "Search tasks", all: "All", overdue: "Overdue", dueSoon: "Next 7 days", snoozed: "Snoozed", timeline: "By date", labelsView: "By label",
     newTask: "New task", editTask: "Edit task", import: "Import", export: "Export",
     done: "Done", later2h: "In 2 hours", tomorrow: "Tomorrow", skip: "Skip", edit: "Edit", history: "History", delete: "Delete", save: "Save changes", create: "Create task", cancel: "Cancel", close: "Close",
@@ -31,6 +32,7 @@ const I18N = {
     now: "Adesso", nothingNow: "Niente da fare adesso", nothingNowHint: "La prossima: {title}, {when}.", allClear: "Nessuna manutenzione in programma.",
     summary: "{overdue} scadute, {soon} nei prossimi 7 giorni, {completed} completate finora",
     streakUnit: "settimane di fila", streakUnit1: "settimana di fila", streakBest: "Record: {n}", streakHint: "Settimane senza attività ad alta priorità lasciate in ritardo.", streakEmpty: "Imposta priorità alta sulle attività importanti per iniziare una serie.", thisWeekOk: "Questa settimana è in regola", thisWeekOpen: "Questa settimana c'è ancora qualcosa da fare",
+    boardTitle: "Sfida della settimana", boardEmpty: "Segna un'attività come fatta per entrare in classifica.", boardMonth: "In testa nel mese: {name} · {points} punti", pts: "punti", champion: "Campione", punctual: "Sempre puntuale", firefighter: "Eroe dell'alta priorità",
     search: "Cerca attività", all: "Tutte", overdue: "Scadute", dueSoon: "Prossimi 7 giorni", snoozed: "Rimandate", timeline: "Per data", labelsView: "Per etichetta",
     newTask: "Nuova attività", editTask: "Modifica attività", import: "Importa", export: "Esporta",
     done: "Fatto", later2h: "Tra 2 ore", tomorrow: "Domani", skip: "Salta", edit: "Modifica", history: "Storico", delete: "Elimina", save: "Salva modifiche", create: "Crea attività", cancel: "Annulla", close: "Chiudi",
@@ -135,6 +137,12 @@ a.btn{color:inherit;text-decoration:none}
 .wk.now{background:transparent;border:2px dashed var(--line)}
 .wk.now.ok{border-color:var(--ok)}
 .streak small{color:var(--mute);font-size:13px}
+.side{align-self:start;display:flex;flex-direction:column;gap:16px;min-width:0}
+.board .eyebrow{margin:0}
+.board ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.board li{display:flex;justify-content:space-between;gap:8px}
+.board li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board li b{font-variant-numeric:tabular-nums;white-space:nowrap}
 
 .summary{color:var(--mute);margin:-14px 0 22px;font-size:14px}
 
@@ -450,7 +458,7 @@ class HomeMaintenancePanel extends HTMLElement {
       focus = `<section class="focus empty"><p class="eyebrow">${esc(this._t("now"))}</p><h2>${esc(this._t("nothingNow"))}</h2>
         <p class="note">${upcoming ? esc(this._t("nothingNowHint", { title: upcoming[0].title, when: upcoming[1].label.toLowerCase() })) : esc(this._t("allClear"))}</p></section>`;
     }
-    return `<div class="now">${focus}${this._streakCard()}</div>`;
+    return `<div class="now">${focus}<div class="side">${this._streakCard()}${this._boardCard()}</div></div>`;
   }
 
   _streakCard() {
@@ -465,6 +473,21 @@ class HomeMaintenancePanel extends HTMLElement {
       <div class="big"><strong>${n}</strong><span>${esc(this._t(n === 1 ? "streakUnit1" : "streakUnit"))}</span></div>
       <div class="weeks" role="img" aria-label="${esc(this._t(st.current_week_ok ? "thisWeekOk" : "thisWeekOpen"))}">${weeks}</div>
       <small>${esc(this._t(st.current_week_ok ? "thisWeekOk" : "thisWeekOpen"))}. ${esc(this._t("streakBest", { n: st.best || 0 }))}</small>
+    </aside>`;
+  }
+
+  _boardCard() {
+    const ch = this._stats?.challenges;
+    if (!ch?.week) return "";
+    const rows = ch.week.standings || [];
+    const medals = ["🥇", "🥈", "🥉"];
+    const list = rows.slice(0, 5).map((r, i) => `<li><span>${medals[i] || `${i + 1}.`} ${esc(r.name)}</span><b>${Number(r.points) || 0} ${esc(this._t("pts"))}</b></li>`).join("");
+    const awards = Object.entries(ch.week.winners || {}).filter(([, names]) => names.length).map(([k, names]) => `<small>${esc(this._t(k))}: ${esc(names.join(", "))}</small>`).join("");
+    const lead = ch.month?.standings?.[0];
+    return `<aside class="streak board" aria-label="${esc(this._t("boardTitle"))}">
+      <p class="eyebrow">${esc(this._t("boardTitle"))}</p>
+      ${rows.length ? `<ol>${list}</ol>${awards}` : `<small>${esc(this._t("boardEmpty"))}</small>`}
+      ${lead ? `<small>${esc(this._t("boardMonth", { name: lead.name, points: lead.points }))}</small>` : ""}
     </aside>`;
   }
 

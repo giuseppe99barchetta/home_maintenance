@@ -4,6 +4,7 @@ import logging
 import uuid
 from collections.abc import Callable, Coroutine
 from datetime import datetime
+from functools import partial
 from typing import Any, cast
 
 import attr
@@ -22,7 +23,7 @@ from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
-from . import const
+from . import const, game
 from .panel import async_register_panel, async_unregister_panel
 from .schedule import day_delta, effective_due_date
 from .store import HomeMaintenanceTask, TaskStore
@@ -42,16 +43,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:  # noqa:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the Home Maintenance config entry."""
-
-    @callback
-    def handle_tag_scanned_event(event: Event) -> None:
-        """Complete tasks associated with a scanned NFC tag."""
-        tag_id = event.data.get("tag_id")
-        store = _store(hass)
-        if store is None or not tag_id:
-            return
-        for task in store.get_by_tag_uuid(tag_id):
-            store.complete_task(task["id"], source="nfc")
 
     @callback
     def handle_state_changed(event: Event) -> None:
@@ -126,13 +117,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await async_register_panel(hass, entry)
 
     hass.data[const.DOMAIN]["unsub_tag_scanned"] = hass.bus.async_listen(
-        EVENT_TAG_SCANNED, handle_tag_scanned_event
+        EVENT_TAG_SCANNED, partial(_handle_tag_scanned, hass)
     )
     hass.data[const.DOMAIN]["unsub_state_changed"] = hass.bus.async_listen(
         EVENT_STATE_CHANGED, handle_state_changed
     )
     hass.data[const.DOMAIN]["unsub_notifications"] = async_track_time_change(
         hass, check_notifications, hour=9, minute=0, second=0
+    )
+    # Not run at startup, so a restart never sends a recap twice.
+    hass.data[const.DOMAIN]["unsub_recaps"] = async_track_time_change(
+        hass, partial(_send_recaps, hass), hour=9, minute=0, second=0
     )
     check_notifications()
     return True
@@ -144,7 +139,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not unload_ok:
         return False
     domain_data = hass.data.get(const.DOMAIN, {})
-    for key in ("unsub_tag_scanned", "unsub_state_changed", "unsub_notifications"):
+    for key in (
+        "unsub_tag_scanned",
+        "unsub_state_changed",
+        "unsub_notifications",
+        "unsub_recaps",
+    ):
         unsub = domain_data.get(key)
         if unsub:
             unsub()
@@ -176,10 +176,57 @@ async def async_migrate_entry(
     return True
 
 
+async def _handle_tag_scanned(hass: HomeAssistant, event: Event) -> None:
+    """Complete tasks associated with a scanned NFC tag."""
+    tag_id = event.data.get("tag_id")
+    store = _store(hass)
+    if store is None or not tag_id:
+        return
+    tasks = store.get_by_tag_uuid(tag_id)
+    if not tasks:
+        return
+    by = await game.async_resolve_by(hass, user_id=event.context.user_id)
+    for task in tasks:
+        store.complete_task(task["id"], source="nfc", by=by)
+
+
+@callback
+def _send_recaps(hass: HomeAssistant, now: datetime) -> None:
+    """On Mondays and on the 1st, announce last week's and month's challenges."""
+    store = _store(hass)
+    if store is None:
+        return
+    periods = [
+        period
+        for period, starts in (
+            ("week", now.weekday() == 0),
+            ("month", now.day == 1),
+        )
+        if starts
+    ]
+    for period in periods:
+        recap = store.recap(period, previous=True)
+        message = game.recap_message(recap, hass.config.language)
+        persistent_notification.async_create(
+            hass,
+            message,
+            title="Home Maintenance",
+            notification_id=f"home_maintenance_recap_{period}",
+        )
+        hass.bus.async_fire(const.EVENT_RECAP, {**recap, "message": message})
+
+
 def _store(hass: HomeAssistant) -> TaskStore | None:
     """Return the loaded task store."""
     data = hass.data.get(const.DOMAIN)
     return data.get("store") if data else None
+
+
+async def _by(hass: HomeAssistant, call: ServiceCall) -> str | None:
+    """Return who called a completing service: the ``user`` field or the caller."""
+    return await game.async_resolve_by(
+        hass, call.data.get("user"), call.context.user_id
+    )
 
 
 def _task_id_from_entity(hass: HomeAssistant, entity_id: str) -> str:
@@ -231,7 +278,9 @@ def _check_step_handler(
         if isinstance(step, int):
             step -= 1  # services use 1-based step numbers
         try:
-            store.check_step(task_id, step, call.data.get("checked"))
+            store.check_step(
+                task_id, step, call.data.get("checked"), by=await _by(hass, call)
+            )
         except RuntimeError as err:
             raise HomeAssistantError(str(err)) from err
 
@@ -261,7 +310,9 @@ def register_services(hass: HomeAssistant) -> None:
             combined = datetime.combine(parsed, datetime.min.time())
             performed_date = dt_util.as_local(combined)
         require_store().complete_task(
-            _task_id_from_entity(hass, call.data["entity_id"]), performed_date
+            _task_id_from_entity(hass, call.data["entity_id"]),
+            performed_date,
+            by=await _by(hass, call),
         )
 
     async def async_srv_create(call: ServiceCall) -> None:
@@ -288,7 +339,7 @@ def register_services(hass: HomeAssistant) -> None:
     async def async_srv_complete(call: ServiceCall) -> None:
         """Complete a task now."""
         task_id = _task_id_from_entity(hass, call.data["entity_id"])
-        require_store().complete_task(task_id)
+        require_store().complete_task(task_id, by=await _by(hass, call))
 
     async def async_srv_snooze(call: ServiceCall) -> None:
         """Snooze a task for the requested number of days."""
@@ -311,7 +362,7 @@ def register_services(hass: HomeAssistant) -> None:
     services = (
         (const.SERVICE_RESET, async_srv_reset, const.SERVICE_RESET_SCHEMA),
         (const.SERVICE_CREATE, async_srv_create, const.SERVICE_CREATE_SCHEMA),
-        (const.SERVICE_COMPLETE, async_srv_complete, const.SERVICE_ENTITY_SCHEMA),
+        (const.SERVICE_COMPLETE, async_srv_complete, const.SERVICE_COMPLETE_SCHEMA),
         (const.SERVICE_SNOOZE, async_srv_snooze, const.SERVICE_SNOOZE_SCHEMA),
         (const.SERVICE_SKIP, async_srv_skip, const.SERVICE_ENTITY_SCHEMA),
         (const.SERVICE_DELETE, async_srv_delete, const.SERVICE_ENTITY_SCHEMA),

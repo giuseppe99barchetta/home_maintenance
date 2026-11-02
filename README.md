@@ -16,6 +16,7 @@ Maintained by **Giuseppe Barchetta** ([@giuseppe99barchetta](https://github.com/
 - 🎯 A **Next maintenance task** sensor that always points at the single most important job
 - ☑️ **Checklists**: split a task into small steps and tick them one at a time
 - 🔥 **Weekly streak** of weeks with no high-priority task left overdue
+- 🏆 **Challenges** between household members, with a weekly and monthly recap (works with Home Assistant users and Telegram)
 - ✨ **AI suggestions** with the AI already set up in Home Assistant: describe a task and get it filled in, or get checklist steps
 - ↷ **Skip** only the current occurrence while preserving history
 - 🔔 Configurable Home Assistant persistent notifications before a task is due
@@ -139,6 +140,48 @@ data:
 
 Attributes: `best`, `current_week_ok`, `recent_weeks` (last eight finished weeks, oldest first), `weeks_tracked`, `tracked_tasks`. The same data is returned by the `statistics` WebSocket command under `streak`.
 
+## 🏆 Challenges and recaps
+
+Every completion is credited to whoever marked it and earns points: **1 / 2 / 3** for a low / normal / high priority task, plus **1 bonus point** when it was done on or before its due day. Each week and each month there are three challenges:
+
+- 🏆 **Champion**: most points
+- ⏱️ **Always on time**: most completions on or before the due day
+- 🔥 **High-priority hero**: most high-priority tasks done
+
+Ties share the title. The panel shows this week's leaderboard and the month leader next to the streak. Every **Monday at 09:00** Home Maintenance sends a recap of the past week, and on the **1st of the month** a recap of the past month, as a persistent notification and as a `home_maintenance_recap` event.
+
+Who completed a task is worked out like this:
+
+- **Panel, services and NFC**: the logged-in Home Assistant user, shown as their `person` when one is linked to that user.
+- **Telegram (or any automation)**: pass `user` to `complete_task`, `reset_last_performed` or `check_step`. It can be a `person.*` entity or a name; a name that matches a person's name (case-insensitive) counts as that person, so the same member is counted once on Home Assistant and Telegram.
+
+```yaml
+# Complete a task from a Telegram inline button, credited to the sender
+triggers:
+  - trigger: event
+    event_type: telegram_callback
+    event_data:
+      data: /done_clean_filter
+actions:
+  - action: home_maintenance.complete_task
+    data:
+      entity_id: binary_sensor.clean_filter
+      user: "{{ trigger.event.data.from_first }}"
+```
+
+```yaml
+# Forward recaps to Telegram
+triggers:
+  - trigger: event
+    event_type: home_maintenance_recap
+actions:
+  - action: telegram_bot.send_message
+    data:
+      message: "{{ trigger.event.data.message }}"
+```
+
+The recap event contains `period` (`week` or `month`), `start`, `end`, `standings` (`who`, `name`, `points`, `completions`, `on_time`, `high`), `winners` and a ready-made `message` (Italian or English, following the Home Assistant language). The `statistics` WebSocket command returns the current week and month under `challenges`. Completions recorded before this feature, or by an entity state, are not credited to anyone.
+
 ## 📲 NFC tags
 
 Associate a Home Assistant `tag.*` entity with a task. Scanning the underlying tag completes the task and records the completion source as NFC.
@@ -187,8 +230,9 @@ Home Maintenance fires these events:
 | `home_maintenance_task_skipped` | The current occurrence is skipped |
 | `home_maintenance_task_due` | A notification-enabled task enters or remains inside its due window |
 | `home_maintenance_step_checked` | A checklist step is ticked or unticked (includes step, index, done and total) |
+| `home_maintenance_recap` | Monday and the 1st of the month at 09:00: last week's or month's challenges |
 
-The completion event includes the task ID, title and completion source where available.
+The completion event includes the task ID, title, completion source and who completed it (`by`) where available.
 
 ## 🧩 Entity attributes
 

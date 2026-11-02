@@ -10,7 +10,7 @@ import attr
 from homeassistant.helpers import entity_registry, storage
 from homeassistant.util import dt as dt_util
 
-from . import const
+from . import const, game
 from .binary_sensor import HomeMaintenanceSensor
 from .schedule import (
     DEFAULT_PRIORITY,
@@ -59,6 +59,8 @@ class HomeMaintenanceTask:
     snoozed_until: str | None = attr.ib(default=None)
     next_due_override: str | None = attr.ib(default=None)
     history: list[str] = attr.ib(factory=list)
+    # Who marked each history entry (same index); None when unknown.
+    history_by: list[str | None] = attr.ib(factory=list)
     skipped: list[str] = attr.ib(factory=list)
     notify_enabled: bool = attr.ib(default=False)
     notify_before_days: int = attr.ib(default=0)
@@ -86,6 +88,10 @@ class HomeMaintenanceTask:
         clean.setdefault("snoozed_until", None)
         clean.setdefault("next_due_override", None)
         clean.setdefault("history", [])
+        by = clean.get("history_by")
+        by = [str(who) if who else None for who in by] if isinstance(by, list) else []
+        count = len(clean["history"])
+        clean["history_by"] = (by + [None] * count)[:count]
         clean.setdefault("skipped", [])
         clean.setdefault("notify_enabled", False)
         clean.setdefault("notify_before_days", 0)
@@ -346,6 +352,7 @@ class TaskStore:
         performed_date: datetime | None = None,
         *,
         source: str = "manual",
+        by: str | None = None,
     ) -> None:
         """Complete a task and append an immutable completion-history entry."""
         entity, task = self._entity_and_task(task_id)
@@ -361,11 +368,12 @@ class TaskStore:
         task.next_due_override = next_override
         task.checklist_done = []
         task.history.append(performed_date_str)
+        task.history_by.append(by)
         entity.task.update(attr.asdict(task))
         self.hass.async_create_task(entity.async_update_ha_state(force_refresh=True))
         self.hass.bus.async_fire(
             const.EVENT_TASK_COMPLETED,
-            {"task_id": task_id, "title": task.title, "source": source},
+            {"task_id": task_id, "title": task.title, "source": source, "by": by},
         )
         self._save()
 
@@ -426,6 +434,7 @@ class TaskStore:
         task_id: str,
         step: int | str,
         checked: bool | None = None,
+        by: str | None = None,
     ) -> bool:
         """
         Tick or untick one checklist step of the current occurrence.
@@ -463,7 +472,7 @@ class TaskStore:
             and task.checklist_autocomplete
             and len(task.checklist_done) == len(task.checklist)
         ):
-            self.complete_task(task_id, source="checklist")
+            self.complete_task(task_id, source="checklist", by=by)
             return True
         entity.task["checklist_done"] = list(task.checklist_done)
         self.hass.async_create_task(entity.async_update_ha_state(force_refresh=True))
@@ -495,6 +504,24 @@ class TaskStore:
             "skipped": skipped,
             "snoozed": snoozed,
             "streak": compute_streak(self.get_all(), dt_util.now()).as_dict(),
+            "challenges": {period: self.recap(period) for period in game.PERIODS},
+        }
+
+    def recap(self, period: str, *, previous: bool = False) -> dict[str, Any]:
+        """Return standings and challenge winners for the current or last period."""
+        now = dt_util.now()
+        start, end = game.period_range(period, now.date(), previous=previous)
+        rows = game.standings(self.get_all(), now, start, end)
+        names = {row["who"]: game.display_name(self.hass, row["who"]) for row in rows}
+        return {
+            "period": period,
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "standings": [{**row, "name": names[row["who"]]} for row in rows],
+            "winners": {
+                challenge: [names[who] for who in whos]
+                for challenge, whos in game.winners(rows).items()
+            },
         }
 
     def export_data(self) -> list[dict[str, Any]]:
