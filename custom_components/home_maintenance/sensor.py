@@ -11,7 +11,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.util import dt as dt_util
 
-from . import const
+from . import const, game
 from .schedule import due_queue, overdue_days, priority_of, priority_score
 from .streak import TRACKED_PRIORITY, compute_streak
 
@@ -31,7 +31,11 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Home Maintenance sensor platform."""
     async_add_entities(
-        [HomeMaintenanceNextTaskSensor(hass), HomeMaintenanceStreakSensor(hass)],
+        [
+            HomeMaintenanceNextTaskSensor(hass),
+            HomeMaintenanceStreakSensor(hass),
+            HomeMaintenancePointsSensor(hass),
+        ],
         update_before_add=True,
     )
 
@@ -138,3 +142,46 @@ class HomeMaintenanceStreakSensor(SensorEntity):
             "tracked_priority": TRACKED_PRIORITY,
             "recent_weeks": list(streak.recent_weeks),
         }
+
+
+class HomeMaintenancePointsSensor(SensorEntity):
+    """Points earned this week by everyone, with the per-person standings."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "points"
+    _attr_icon = "mdi:trophy"
+    _attr_unique_id = f"{const.DOMAIN}_points"
+    _attr_native_unit_of_measurement = "pts"
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        """Initialize the sensor."""
+        self.hass = hass
+        self.entity_id = f"sensor.{const.DOMAIN}_points"
+        self._attr_native_value = 0
+        self._attr_extra_state_attributes = {"week": [], "month": []}
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Attach the sensor to the Home Maintenance hub device."""
+        return _hub_device_info()
+
+    async def async_update(self) -> None:
+        """Recompute the standings from the stored history."""
+        data = self.hass.data.get(const.DOMAIN) or {}
+        store = data.get("store")
+        if store is None:
+            return
+        now = dt_util.now()
+        tasks = store.get_all()
+        attrs: dict[str, Any] = {}
+        for period in game.PERIODS:
+            start, end = game.period_range(period, now.date())
+            rows = game.standings(tasks, now, start, end)
+            attrs[period] = [
+                {**row, "name": game.display_name(self.hass, row["who"])}
+                for row in rows
+            ]
+            if period == "week":
+                attrs["winners"] = game.winners(rows)
+        self._attr_native_value = sum(row["points"] for row in attrs["week"])
+        self._attr_extra_state_attributes = attrs

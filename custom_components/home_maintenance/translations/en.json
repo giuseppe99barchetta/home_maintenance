@@ -36,6 +36,9 @@
       },
       "streak": {
         "name": "Weekly streak"
+      },
+      "points": {
+        "name": "Weekly points"
       }
     }
   }
