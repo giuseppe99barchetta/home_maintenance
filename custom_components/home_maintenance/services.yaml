@@ -143,6 +143,34 @@ complete_task:
       selector:
         text:
 
+set_completion_by:
+  name: Set completed by
+  description: Change who did a past completion, without adding a history entry. Use several comma-separated names when done together.
+  fields:
+    entity_id:
+      name: Entity ID
+      required: true
+      selector:
+        entity:
+          domain: binary_sensor
+          integration: home_maintenance
+    user:
+      name: Completed by
+      description: A person entity or name; "Alessia, Giuseppe" credits both.
+      required: true
+      selector:
+        text:
+    index:
+      name: History position
+      description: -1 is the latest completion, -2 the one before.
+      required: false
+      default: -1
+      selector:
+        number:
+          min: -100
+          max: 100
+          mode: box
+
 snooze_task:
   name: Snooze task
   description: Postpone the current task without changing its completion history.

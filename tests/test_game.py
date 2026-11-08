@@ -58,6 +58,12 @@ def test_points_on_time_bonus_and_unattributed() -> None:
     }
 
 
+def test_done_together_credits_everyone() -> None:
+    low = _weekly(["2026-10-13"], ["person.anna,Luca"], "low")
+    rows = standings([low], NOW, date(2026, 10, 1), date(2026, 10, 31))
+    assert [(r["who"], r["points"]) for r in rows] == [("Luca", 2), ("person.anna", 2)]
+
+
 def test_nobody_wins_an_empty_period() -> None:
     assert winners([]) == {"champion": [], "punctual": [], "firefighter": []}
     recap = {

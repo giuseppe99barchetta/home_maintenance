@@ -341,6 +341,17 @@ def register_services(hass: HomeAssistant) -> None:
         task_id = _task_id_from_entity(hass, call.data["entity_id"])
         require_store().complete_task(task_id, by=await _by(hass, call))
 
+    async def async_srv_set_by(call: ServiceCall) -> None:
+        """Change who did a past completion."""
+        store = require_store()
+        task_id = _task_id_from_entity(hass, call.data["entity_id"])
+        by = await game.async_resolve_by(hass, call.data["user"])
+        try:
+            store.set_completion_by(task_id, cast("str", by), call.data["index"])
+        except (IndexError, TypeError) as err:
+            msg = "No such completion or no user given"
+            raise HomeAssistantError(msg) from err
+
     async def async_srv_snooze(call: ServiceCall) -> None:
         """Snooze a task for the requested number of days."""
         require_store().snooze_task(
@@ -363,6 +374,11 @@ def register_services(hass: HomeAssistant) -> None:
         (const.SERVICE_RESET, async_srv_reset, const.SERVICE_RESET_SCHEMA),
         (const.SERVICE_CREATE, async_srv_create, const.SERVICE_CREATE_SCHEMA),
         (const.SERVICE_COMPLETE, async_srv_complete, const.SERVICE_COMPLETE_SCHEMA),
+        (
+            const.SERVICE_SET_COMPLETION_BY,
+            async_srv_set_by,
+            const.SERVICE_SET_COMPLETION_BY_SCHEMA,
+        ),
         (const.SERVICE_SNOOZE, async_srv_snooze, const.SERVICE_SNOOZE_SCHEMA),
         (const.SERVICE_SKIP, async_srv_skip, const.SERVICE_ENTITY_SCHEMA),
         (const.SERVICE_DELETE, async_srv_delete, const.SERVICE_ENTITY_SCHEMA),

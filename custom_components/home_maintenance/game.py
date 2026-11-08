@@ -73,11 +73,13 @@ def standings(tasks: list[dict], now: datetime, start: date, end: date) -> list[
         for day, by, on_time in _completions(task, now):
             if not by or not start <= day <= end:
                 continue
-            row = totals[by]
-            row["completions"] += 1
-            row["points"] += POINTS[priority] + (ON_TIME_BONUS if on_time else 0)
-            row["on_time"] += on_time
-            row["high"] += priority == "high"
+            # "a,b" = done together: everyone gets the full points.
+            for who in by.split(","):
+                row = totals[who]
+                row["completions"] += 1
+                row["points"] += POINTS[priority] + (ON_TIME_BONUS if on_time else 0)
+                row["on_time"] += on_time
+                row["high"] += priority == "high"
     rows = [{"who": who, **row} for who, row in totals.items()]
     return sorted(rows, key=lambda r: (-r["points"], -r["completions"], r["who"]))
 
@@ -110,11 +112,17 @@ async def async_resolve_by(
     """
     people = hass.states.async_all("person")
     if user := (user or "").strip():
-        wanted = user.casefold()
-        for state in people:
-            if wanted in (state.entity_id, state.name.casefold()):
-                return state.entity_id
-        return user
+
+        def match(name: str) -> str:
+            wanted = name.casefold()
+            for state in people:
+                if wanted in (state.entity_id, state.name.casefold()):
+                    return state.entity_id
+            return name
+
+        # Comma-separated names mean "done together".
+        names = [match(name.strip()) for name in user.split(",") if name.strip()]
+        return ",".join(dict.fromkeys(names)) or None
     if not user_id:
         return None
     for state in people:
