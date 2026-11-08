@@ -377,6 +377,13 @@ class TaskStore:
         )
         self._save()
 
+    def set_completion_by(self, task_id: str, by: str, index: int = -1) -> None:
+        """Change who did a past completion (no new history entry)."""
+        entity, task = self._entity_and_task(task_id)
+        task.history_by[index] = by
+        entity.task.update(attr.asdict(task))
+        self._save()
+
     def update_last_performed(
         self, task_id: str, performed_date: datetime | None = None
     ) -> None:

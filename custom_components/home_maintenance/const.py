@@ -74,6 +74,15 @@ SERVICE_ENTITY_SCHEMA = vol.Schema({vol.Required("entity_id"): cv.entity_id})
 SERVICE_COMPLETE_SCHEMA = SERVICE_ENTITY_SCHEMA.extend(
     {vol.Optional("user"): cv.string}
 )
+SERVICE_SET_COMPLETION_BY = "set_completion_by"
+# Fix who did a past completion: ``user`` may list several names, comma-separated.
+SERVICE_SET_COMPLETION_BY_SCHEMA = SERVICE_ENTITY_SCHEMA.extend(
+    {
+        vol.Required("user"): cv.string,
+        # Position in the history; -1 is the latest completion.
+        vol.Optional("index", default=-1): vol.Coerce(int),
+    }
+)
 
 
 def _require_snooze_length(value: dict) -> dict:
